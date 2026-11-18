@@ -1,0 +1,23 @@
+# Keil C251 build artifacts
+Objects/
+Listings/
+*.hex
+*.HEX
+*.lst
+*.LST
+*.map
+*.MAP
+*.obj
+*.OBJ
+*.m51
+*.lnp
+*.plg
+*.SBR
+*.sbr
+*.__i
+*.uvgui.*
+build.log
+
+# OS noise
+Thumbs.db
+desktop.ini
