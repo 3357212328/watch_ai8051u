@@ -12,6 +12,10 @@
 static AppMode xdata WatchMode = APP_WATCH_FACE;
 static unsigned char xdata WatchPendingFace = 0;
 
+/* App that was running when the ring hijacked the display. Restored
+ * when the banner is dismissed; menu/face fall back to the face. */
+static unsigned char xdata WatchRingPrevMode = APP_WATCH_FACE;
+
 /* Page the stopwatch was entered from, returned to on Back */
 static MenuPage * xdata WatchSWReturnPage = NULL;
 
@@ -38,6 +42,14 @@ int16_t edata Watch_StageDay = 1;
 int16_t edata Watch_StageHour = 12;
 int16_t edata Watch_StageMinute = 0;
 int16_t edata Watch_StageSecond = 0;
+
+/* Dirty bitmap of the Time Set edit windows, bit0..5 = Year..Second.
+ * A bit is set by Watch_TimeSet_Touch() when the user actually opens
+ * (and therefore edits) a field. Save only takes the staged value for
+ * dirty fields; every other field is re-read from the RTC, so the boot
+ * snapshot in Watch_Stage* can no longer be written back days later.
+ * Not clearing it on init is fine: nothing is dirty at boot (zero). */
+static unsigned char xdata WatchTimeSetDirty = 0;
 
 /* Working area for the watch face renderer */
 static WatchTime xdata WatchFaceTime;
@@ -140,23 +152,78 @@ void Watch_OpenStopwatch(void)
 }
 
 /*
- * @brief Apply the Time Set staging values to the RTC. Stage values
- *        are bounded by their windows' Min/Max; WatchTime_Set clamps
- *        month/day interactions (leap years, short months). Saving
- *        restarts the sub-second fraction at zero.
+ * @brief Mark one Time Set field as edited and refresh its staging
+ *        value from the live RTC, so an edit window always opens on
+ *        the current time instead of the boot-time snapshot.
+ *        field: 0 = Year, 1 = Month, 2 = Day, 3 = Hour, 4 = Minute,
+ *        5 = Second; anything else is ignored.
+ */
+void Watch_TimeSet_Touch(unsigned char field)
+{
+    WatchTime t;
+
+    if (field > 5U)
+    {
+        return;
+    }
+    WatchTime_Read(&t);
+    switch (field)
+    {
+        case 0: Watch_StageYear   = (int16_t)(2000 + t.Year); break;
+        case 1: Watch_StageMonth  = t.Month;  break;
+        case 2: Watch_StageDay    = t.Day;    break;
+        case 3: Watch_StageHour   = t.Hour;   break;
+        case 4: Watch_StageMinute = t.Minute; break;
+        case 5: Watch_StageSecond = t.Second; break;
+        default: break;
+    }
+    WatchTimeSetDirty |= (unsigned char)(1U << field);
+}
+
+/*
+ * @brief Apply the Time Set staging values to the RTC - but only for
+ *        the fields the user actually edited (WatchTimeSetDirty).
+ *        Every other field keeps the value just read from the RTC, so
+ *        Save can no longer rewind the clock to the boot-time snapshot.
+ *        Pressing Save without opening any edit window therefore writes
+ *        the current time back unchanged (harmless no-op).
+ *        Staged values are bounded by their windows' Min/Max and
+ *        WatchTime_Set clamps month/day interactions (leap years,
+ *        short months). It also restarts the sub-second fraction at 0.
  */
 void Watch_TimeSet_Save(void)
 {
     WatchTime t;
 
-    t.SubSec = 0;   /* saving restarts the sub-second fraction */
-    t.Year   = (uint8_t)(Watch_StageYear - 2000);
-    t.Month  = (uint8_t)Watch_StageMonth;
-    t.Day    = (uint8_t)Watch_StageDay;
-    t.Hour   = (uint8_t)Watch_StageHour;
-    t.Minute = (uint8_t)Watch_StageMinute;
-    t.Second = (uint8_t)Watch_StageSecond;
+    WatchTime_Read(&t);   /* base = current time, not the boot snapshot */
+
+    if ((WatchTimeSetDirty & 0x01U) != 0)
+    {
+        t.Year = (uint8_t)(Watch_StageYear - 2000);
+    }
+    if ((WatchTimeSetDirty & 0x02U) != 0)
+    {
+        t.Month = (uint8_t)Watch_StageMonth;
+    }
+    if ((WatchTimeSetDirty & 0x04U) != 0)
+    {
+        t.Day = (uint8_t)Watch_StageDay;
+    }
+    if ((WatchTimeSetDirty & 0x08U) != 0)
+    {
+        t.Hour = (uint8_t)Watch_StageHour;
+    }
+    if ((WatchTimeSetDirty & 0x10U) != 0)
+    {
+        t.Minute = (uint8_t)Watch_StageMinute;
+    }
+    if ((WatchTimeSetDirty & 0x20U) != 0)
+    {
+        t.Second = (uint8_t)Watch_StageSecond;
+    }
+
     WatchTime_Set(&t);
+    WatchTimeSetDirty = 0;   /* next save starts from the live RTC again */
 }
 
 /*
@@ -284,6 +351,18 @@ static void Watch_StopwatchTick(void)
 static void Watch_RingTick(void);
 
 /*
+ * @brief Re-park the stopwatch release-edge trackers after a ring
+ *        hijack. The accumulated centiseconds and the run/pause state
+ *        are deliberately left untouched, so the user resumes exactly
+ *        where the alarm interrupted.
+ */
+static void Watch_StopwatchPark(void)
+{
+    WatchSWLastEnter = (unsigned char)(Key_GetEnterStatus() == 0);
+    WatchSWLastBack  = (unsigned char)(Key_GetBackStatus()  == 0);
+}
+
+/*
  * @brief 20 ms tick of the shared ring banner: drain every virtual
  *        source once, sample the four keys, then ANY input event
  *        (release edge, USB pulse or encoder detent) stops the ring
@@ -321,11 +400,46 @@ static void Watch_RingTick(void)
 
     if (any != 0)
     {
+        unsigned char prev;
+
         /* Beep off and clear the flag BEFORE switching mode, so the
          * banner cannot re-trigger on the next tick. */
         Watch_Ring_Stop();
-        /* Face entry parks the face trackers live, fades, updates. */
-        Watch_EnterFaceFromMenu();
+        prev = WatchRingPrevMode;
+        WatchRingPrevMode = APP_WATCH_FACE;
+
+        /* Return to the app the ring hijacked. The Park() helpers only
+         * drain queued input and stale 20 ms fires and re-park the edge
+         * trackers - they never touch the accumulated progress, so the
+         * user resumes where the alarm hit (games are never hijacked).
+         * Menu / face keep the old "back to the face" behaviour; the
+         * menu framework state is not restored. */
+        if (prev == (unsigned char)APP_STOPWATCH)
+        {
+            Watch_StopwatchPark();
+            WatchMode = APP_STOPWATCH;
+        }
+        else if (prev == (unsigned char)APP_UPTIMER)
+        {
+            Watch_Uptimer_Park();
+            WatchMode = APP_UPTIMER;
+        }
+        else if (prev == (unsigned char)APP_COUNTDN)
+        {
+            Watch_Countdown_Park();
+            WatchMode = APP_COUNTDN;
+        }
+        else if (prev == (unsigned char)APP_CALENDAR)
+        {
+            /* No progress to keep: reopening today's month is enough. */
+            Watch_Calendar_Open();
+            WatchMode = APP_CALENDAR;
+        }
+        else
+        {
+            /* Face entry parks the face trackers live, fades, updates. */
+            Watch_EnterFaceFromMenu();
+        }
     }
 }
 
@@ -339,19 +453,6 @@ void Watch_OpenCalendar(void)
     OLED_UI_FadeoutAllArea();
     OLED_Update();
     WatchMode = APP_CALENDAR;
-}
-
-/*
- * @brief "Alarm" item callback: open the alarm status page (this is
- *        NOT the ring, which owns APP_RING and the "ALARM!" banner).
- */
-void Watch_OpenAlarm(void)
-{
-    WatchSWReturnPage = CurrentMenuPage;
-    Watch_Alarm_Open();           /* parks the module trackers */
-    OLED_UI_FadeoutAllArea();
-    OLED_Update();
-    WatchMode = APP_ALARM;
 }
 
 /*
@@ -415,8 +516,12 @@ void Watch_Tick(void)
      * whose tick is paused mid-game, so it cannot fire there). The
      * games deliberately do NOT consume the flag mid-play: it stays
      * pending (never cleared) and the banner shows the moment a
-     * non-game mode resumes. */
+     * non-game mode resumes. APP_RING must be excluded too: the flag
+     * stays up for the whole banner, so re-entering this block every
+     * tick would overwrite the remembered mode with APP_WATCH_FACE and
+     * the hand-back would always land on the face. */
     if (WatchMode != APP_DINO && WatchMode != APP_PLANE &&
+        WatchMode != APP_RING &&
         Watch_Ring_Active() != 0)
     {
         if (WatchMode == APP_MENU)
@@ -441,6 +546,18 @@ void Watch_Tick(void)
         WatchFaceLastBack  = (unsigned char)(Key_GetBackStatus()  == 0);
         WatchFaceLastUp    = (unsigned char)(Key_GetUpStatus()    == 0);
         WatchFaceLastDown  = (unsigned char)(Key_GetDownStatus()  == 0);
+        /* Remember the interrupted app so the ring can hand control
+         * back to it instead of always landing on the face. Menu and
+         * face collapse to APP_WATCH_FACE (no menu state to restore). */
+        if (WatchMode == APP_STOPWATCH || WatchMode == APP_CALENDAR ||
+            WatchMode == APP_UPTIMER || WatchMode == APP_COUNTDN)
+        {
+            WatchRingPrevMode = (unsigned char)WatchMode;
+        }
+        else
+        {
+            WatchRingPrevMode = (unsigned char)APP_WATCH_FACE;
+        }
         WatchMode = APP_RING;
     }
 
@@ -468,10 +585,6 @@ void Watch_Tick(void)
 
         case APP_CALENDAR:
             if (Watch_Calendar_Tick() != 0) { Watch_ExitNewApp(); }
-            break;
-
-        case APP_ALARM:
-            if (Watch_Alarm_Tick() != 0) { Watch_ExitNewApp(); }
             break;
 
         case APP_UPTIMER:
@@ -522,10 +635,6 @@ void Watch_Render(void)
     else if (WatchMode == APP_CALENDAR)
     {
         Watch_Calendar_Render();
-    }
-    else if (WatchMode == APP_ALARM)
-    {
-        Watch_Alarm_Render();
     }
     else if (WatchMode == APP_RING)
     {

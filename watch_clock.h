@@ -13,12 +13,10 @@
 /* called from Timer11 ISR hook context (watch_face integration), every 20ms */
 void Watch_ClockTick20(void);
 
-/* ---- Alarm clock ---- */
-void Watch_Alarm_Open(void);            /* parks internal trackers from live pins */
-unsigned char Watch_Alarm_Tick(void);   /* 20ms tick; returns 1 = user requests exit */
-void Watch_Alarm_Render(void);          /* full-screen "ALARM" status page */
-void Watch_Alarm_Toggle(void);          /* menu callback: flips enabled flag */
-unsigned char Watch_Alarm_Enabled(void);
+/* ---- Alarm clock (flag only; the status page was removed) ---- */
+/* On/off flag, bound directly to the menu radio item. Must be edata:
+ * List_BoolRadioBox is an `unsigned char edata *` (oled_ui.h:303). */
+extern unsigned char edata ClkAlarmEnabled;
 /* stage ints for framework edit windows (bound later by integration) */
 extern int16_t edata Watch_StageAlarmHour;    /* 0..23 */
 extern int16_t edata Watch_StageAlarmMinute;  /* 0..59 */
@@ -33,11 +31,14 @@ void Watch_Ring_Render(void);           /* flashing full-screen banner + beep bu
 
 /* ---- Up-running timer (count-up "timer" page, separate from stopwatch) ---- */
 void Watch_Uptimer_Open(void);
+void Watch_Uptimer_Park(void);          /* ring return: keep ticks, drop input */
 unsigned char Watch_Uptimer_Tick(void); /* 1 = exit request */
 void Watch_Uptimer_Render(void);
 
 /* ---- Countdown ---- */
-void Watch_Countdown_Open(void);        /* parks trackers */
+void Watch_Countdown_Open(void);        /* parks trackers; keeps held remainder */
+void Watch_Countdown_Park(void);        /* ring return: keep remainder, drop input */
+void Watch_Countdown_Reset(void);       /* reload from staging ("Start!" item) */
 unsigned char Watch_Countdown_Tick(void);/* 1 = exit request */
 void Watch_Countdown_Render(void);
 extern int16_t edata Watch_StageCountMin;     /* 0..99 */

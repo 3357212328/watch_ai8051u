@@ -1,0 +1,233 @@
+<mxfile host="app.diagrams.net" type="device">
+  <diagram id="watch-hw-lqfp48" name="手表整机原理图">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="AI8051U 手表整机原理图（LQFP48 转接板 · 直插优先）" style="text;html=1;fontSize=22;fontStyle=1;align=left;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="40" y="16" width="900" height="34" as="geometry" />
+        </mxCell>
+
+        <mxCell id="c1" value="① 电源与充电（AI8051U 无 RTC 后备脚，电池只维持整机）" style="swimlane;startSize=28;html=1;fillColor=#fff6f0;strokeColor=#d79b00;fontSize=13;fontStyle=1;verticalAlign=top;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="40" y="70" width="520" height="420" as="geometry" />
+        </mxCell>
+        <mxCell id="usb" value="Micro-USB 直插母座&lt;br&gt;VBUS · D− · D+ · GND" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" vertex="1" parent="c1">
+          <mxGeometry x="20" y="50" width="150" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="d1" value="D1&lt;br&gt;1N5819" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" vertex="1" parent="c1">
+          <mxGeometry x="200" y="55" width="90" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="vcc" value="&lt;b&gt;VCC 3.4–4.7 V&lt;/b&gt;&lt;br&gt;MCU VCC(41) + OLED VCC" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12;fontStyle=0;" vertex="1" parent="c1">
+          <mxGeometry x="320" y="52" width="175" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="tp" value="TP4056 模块（带 DW01 保护）&lt;br&gt;IN+ / IN−&lt;br&gt;BAT+ / BAT−&lt;br&gt;OUT+ / OUT−" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" vertex="1" parent="c1">
+          <mxGeometry x="195" y="135" width="180" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="bat" value="14500 锂电&lt;br&gt;3.7 V / 800 mAh" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" vertex="1" parent="c1">
+          <mxGeometry x="20" y="185" width="150" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="sw1" value="SW1 拨动 1P2T" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" vertex="1" parent="c1">
+          <mxGeometry x="20" y="285" width="110" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="d2" value="D2&lt;br&gt;1N5819" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" vertex="1" parent="c1">
+          <mxGeometry x="200" y="285" width="90" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="c1a" value="C1 10µF&lt;br&gt;VCC ↔ GND" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;" vertex="1" parent="c1">
+          <mxGeometry x="390" y="130" width="105" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="c2a" value="C2 100nF&lt;br&gt;VCC ↔ GND" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;" vertex="1" parent="c1">
+          <mxGeometry x="390" y="190" width="105" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="c3a" value="C3 100nF&lt;br&gt;VCC ↔ GND" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;" vertex="1" parent="c1">
+          <mxGeometry x="390" y="250" width="105" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="pwrnote" value="插 USB：5 V − 0.3 V 供整机，同时给电池充电&lt;br&gt;拔 USB：电池经 SW1、TP4056、D2 供整机，RTC 不停&lt;br&gt;充电电流：模块上的 Rprog 换 10 kΩ ≈ 130 mA" style="text;html=1;fontSize=11;align=left;verticalAlign=top;spacingLeft=2;" vertex="1" parent="c1">
+          <mxGeometry x="20" y="345" width="475" height="62" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e1" value="VBUS 5 V" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#d79b00;strokeWidth=1.5;fontSize=10;" edge="1" source="usb" target="d1" parent="c1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="VCC" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#d79b00;strokeWidth=1.5;fontSize=10;" edge="1" source="d1" target="vcc" parent="c1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="IN+" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#d79b00;strokeWidth=1.5;fontSize=10;" edge="1" source="usb" target="tp" parent="c1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="OUT+" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#d79b00;strokeWidth=1.5;fontSize=10;" edge="1" source="tp" target="d2" parent="c1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="VCC" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#d79b00;strokeWidth=1.5;fontSize=10;" edge="1" source="d2" target="vcc" parent="c1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="BAT+" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#d79b00;strokeWidth=1.5;fontSize=10;" edge="1" source="bat" target="sw1" parent="c1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="BAT+" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#d79b00;strokeWidth=1.5;fontSize=10;" edge="1" source="sw1" target="tp" parent="c1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="c2" value="② 主控 AI8051U-34K64（LQFP48）" style="swimlane;startSize=28;html=1;fillColor=#f0f4fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;verticalAlign=top;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="620" y="70" width="380" height="620" as="geometry" />
+        </mxCell>
+        <mxCell id="mcu" value="&lt;div style=&quot;font-family:Courier New;font-size:12px;text-align:left;line-height:150%&quot;&gt;&lt;b&gt;AI8051U-34K64&lt;/b&gt;  LQFP48&lt;br&gt;&lt;br&gt;5  P4.7   nRST（复位键）&lt;br&gt;6  P3.0   USB D−&lt;br&gt;8  P3.1   USB D+&lt;br&gt;9  P3.2   KEY_ENTER&lt;br&gt;10 P3.3   KEY_BACK&lt;br&gt;13 P3.6   KEY_UP&lt;br&gt;14 P3.7   KEY_DOWN&lt;br&gt;15 P5.6   XTALO&lt;br&gt;16 P5.7   XTALI&lt;br&gt;17 GND&lt;br&gt;22 P2.3   SDA&lt;br&gt;23 P2.4   SCL&lt;br&gt;24 P5.0   BUZZ&lt;br&gt;29 UCAP&lt;br&gt;41 VCC&lt;br&gt;43 P1.0   ENC_A&lt;br&gt;44 P1.1   ENC_B&lt;br&gt;&lt;br&gt;其余引脚空置：&lt;br&gt;1 2 3 4 7 11 12 18–21&lt;br&gt;25–28 30–40 42 45–48&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;align=left;verticalAlign=top;spacingLeft=10;spacingTop=8;" vertex="1" parent="c2">
+          <mxGeometry x="30" y="40" width="320" height="500" as="geometry" />
+        </mxCell>
+        <mxCell id="c4" value="C4 1µF&lt;br&gt;UCAP(29) ↔ GND&lt;br&gt;&lt;b&gt;不可省&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="c2">
+          <mxGeometry x="30" y="555" width="150" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="fwnote" value="固件开关（本图配置）：&lt;br&gt;WATCH_USE_X32K = 1&lt;br&gt;WATCH_BUZZ_P34 = 0" style="text;html=1;fontSize=11;align=left;verticalAlign=top;" vertex="1" parent="c2">
+          <mxGeometry x="195" y="548" width="175" height="62" as="geometry" />
+        </mxCell>
+
+        <mxCell id="c3" value="③ 32.768 kHz 晶振（走时精度的全部来源）" style="swimlane;startSize=28;html=1;fillColor=#f7f2fa;strokeColor=#9673a6;fontSize=13;fontStyle=1;verticalAlign=top;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="70" width="380" height="270" as="geometry" />
+        </mxCell>
+        <mxCell id="p56" value="MCU P5.6 (15)&lt;br&gt;XTALO" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;dashed=1;fontSize=11;" vertex="1" parent="c3">
+          <mxGeometry x="14" y="45" width="125" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="p57" value="MCU P5.7 (16)&lt;br&gt;XTALI" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;dashed=1;fontSize=11;" vertex="1" parent="c3">
+          <mxGeometry x="14" y="120" width="125" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="y1" value="Y1&lt;br&gt;32.768 kHz&lt;br&gt;12.5 pF 圆柱直插" style="ellipse;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="c3">
+          <mxGeometry x="165" y="55" width="115" height="105" as="geometry" />
+        </mxCell>
+        <mxCell id="c5" value="C5 18pF" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="c3">
+          <mxGeometry x="295" y="30" width="75" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="c6" value="C6 18pF" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="c3">
+          <mxGeometry x="295" y="110" width="75" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="r1" value="R1 10MΩ&lt;br&gt;（可选）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="c3">
+          <mxGeometry x="295" y="185" width="75" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="gndx" value="GND" style="text;html=1;fontSize=11;align=center;" vertex="1" parent="c3">
+          <mxGeometry x="120" y="232" width="60" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="xnote" value="晶振与两只电容紧贴 P5.6/P5.7，围成的环 &amp;lt; 10 mm 见方；&lt;br&gt;别让 I2C、蜂鸣器线从旁边穿过；焊完洗板再测。" style="text;html=1;fontSize=11;align=left;verticalAlign=top;" vertex="1" parent="c3">
+          <mxGeometry x="14" y="180" width="270" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=none;strokeColor=#9673a6;strokeWidth=1.5;" edge="1" source="p56" target="y1" parent="c3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=none;strokeColor=#9673a6;strokeWidth=1.5;" edge="1" source="p57" target="y1" parent="c3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e10" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=none;strokeColor=#9673a6;strokeWidth=1.5;" edge="1" source="y1" target="c5" parent="c3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e11" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=none;strokeColor=#9673a6;strokeWidth=1.5;" edge="1" source="y1" target="c6" parent="c3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e12" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=none;strokeColor=#9673a6;strokeWidth=1.5;" edge="1" source="y1" target="r1" parent="c3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="c4g" value="④ 显示（I2C 开漏，上拉在模块内）" style="swimlane;startSize=28;html=1;fillColor=#fdf2f2;strokeColor=#b85450;fontSize=13;fontStyle=1;verticalAlign=top;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="370" width="380" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="oled" value="OLED 0.96 英寸&lt;br&gt;SSD1306 128×64&lt;br&gt;I2C 地址 0x78" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="c4g">
+          <mxGeometry x="18" y="42" width="175" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="l_sda" value="P2.3 (22) SDA" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;dashed=1;fontSize=11;" vertex="1" parent="c4g">
+          <mxGeometry x="215" y="42" width="145" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="l_scl" value="P2.4 (23) SCL" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;dashed=1;fontSize=11;" vertex="1" parent="c4g">
+          <mxGeometry x="215" y="80" width="145" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="l_pwr" value="VCC · GND" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;dashed=1;fontSize=11;" vertex="1" parent="c4g">
+          <mxGeometry x="215" y="118" width="145" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="e13" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#b85450;strokeWidth=1.5;" edge="1" source="l_sda" target="oled" parent="c4g">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e14" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#b85450;strokeWidth=1.5;" edge="1" source="l_scl" target="oled" parent="c4g">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="c5g" value="⑤ 人机输入（按键 / EC11 编码器）" style="swimlane;startSize=28;html=1;fillColor=#f3faf1;strokeColor=#82b366;fontSize=13;fontStyle=1;verticalAlign=top;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="580" width="380" height="300" as="geometry" />
+        </mxCell>
+        <mxCell id="k_enter" value="ENTER 键&lt;br&gt;P3.2 (9)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="c5g">
+          <mxGeometry x="15" y="40" width="145" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="k_back" value="BACK 键&lt;br&gt;P3.3 (10)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="c5g">
+          <mxGeometry x="15" y="95" width="145" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="k_up" value="UP 键&lt;br&gt;P3.6 (13)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="c5g">
+          <mxGeometry x="15" y="150" width="145" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="k_down" value="DOWN 键&lt;br&gt;P3.7 (14)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="c5g">
+          <mxGeometry x="15" y="205" width="145" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="gndk" value="每只按键另一端 → GND（低电平有效，内部上拉）" style="text;html=1;fontSize=11;align=left;" vertex="1" parent="c5g">
+          <mxGeometry x="15" y="262" width="340" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="ec11" value="EC11 编码器&lt;br&gt;A / B / C(GND)&lt;br&gt;+ 按压开关" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="c5g">
+          <mxGeometry x="200" y="40" width="160" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="l_enca" value="A → P1.0 (43)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;dashed=1;fontSize=11;" vertex="1" parent="c5g">
+          <mxGeometry x="200" y="150" width="160" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="l_encb" value="B → P1.1 (44)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;dashed=1;fontSize=11;" vertex="1" parent="c5g">
+          <mxGeometry x="200" y="184" width="160" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="encnote" value="A、B 各加 10 kΩ 上拉 + 100 nF 到地&lt;br&gt;C 接 GND" style="text;html=1;fontSize=11;align=left;verticalAlign=top;" vertex="1" parent="c5g">
+          <mxGeometry x="200" y="218" width="165" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="c6g" value="⑥ 蜂鸣器（P5.0 强推挽 → S8050）" style="swimlane;startSize=28;html=1;fillColor=#fffdf0;strokeColor=#d6b656;fontSize=13;fontStyle=1;verticalAlign=top;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="620" y="720" width="380" height="210" as="geometry" />
+        </mxCell>
+        <mxCell id="l_buzz" value="MCU P5.0 (24)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;dashed=1;fontSize=11;" vertex="1" parent="c6g">
+          <mxGeometry x="14" y="42" width="125" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="r2" value="R2 1kΩ" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="c6g">
+          <mxGeometry x="14" y="90" width="95" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="q1" value="Q1 S8050&lt;br&gt;TO-92&lt;br&gt;B / C / E" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="c6g">
+          <mxGeometry x="135" y="80" width="105" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="buzz" value="无源蜂鸣器&lt;br&gt;2–4 kHz" style="ellipse;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="c6g">
+          <mxGeometry x="265" y="45" width="100" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="vccb" value="VCC" style="text;html=1;fontSize=11;align=center;" vertex="1" parent="c6g">
+          <mxGeometry x="285" y="20" width="60" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="gndb" value="GND" style="text;html=1;fontSize=11;align=center;" vertex="1" parent="c6g">
+          <mxGeometry x="200" y="168" width="60" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="d3" value="D3 1N4148（反峰，电磁式必装）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="c6g">
+          <mxGeometry x="250" y="122" width="120" height="38" as="geometry" />
+        </mxCell>
+        <mxCell id="r3" value="R3 10 kΩ 基极下拉到 GND（防上电误响）" style="text;html=1;fontSize=10;align=left;verticalAlign=top;whiteSpace=wrap;" vertex="1" parent="c6g">
+          <mxGeometry x="14" y="145" width="115" height="48" as="geometry" />
+        </mxCell>
+        <mxCell id="e15" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#d6b656;strokeWidth=1.5;" edge="1" source="l_buzz" target="r2" parent="c6g">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e16" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#d6b656;strokeWidth=1.5;" edge="1" source="r2" target="q1" parent="c6g">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e17" value="+" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#d6b656;strokeWidth=1.5;fontSize=10;" edge="1" source="vccb" target="buzz" parent="c6g">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e18" value="−" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#d6b656;strokeWidth=1.5;fontSize=10;" edge="1" source="buzz" target="q1" parent="c6g">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e19" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#d6b656;strokeWidth=1.5;" edge="1" source="q1" target="gndb" parent="c6g">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="legend" value="&lt;b&gt;看图说明&lt;/b&gt;&lt;br&gt;&lt;br&gt;1. 虚线框 = 网络引用，文字里的 Px.y（脚号）就是主控同名脚，同名即同一根线。&lt;br&gt;2. 实线 = 实际导线；两个 1N5819 构成最省事的电源路径。&lt;br&gt;3. 本图按 LQFP48 画，需 48 脚转接板。若改用 PDIP40：蜂鸣器从 P5.0(24) 改到 P3.4(14 脚)，固件设 WATCH_BUZZ_P34 = 1；其余脚位不变。&lt;br&gt;4. UCAP(29) 的 1 µF 不可省，否则 USB 完全不被识别。&lt;br&gt;5. P3.2 兼 USB 下载脚：上电瞬间按住 ENTER 就进 ISP 下载。&lt;br&gt;6. AI8051U 没有 RTC 后备电源脚：电池只维持整机，断电后时间回到 2026-01-01 12:00。&lt;br&gt;7. 待机约 22 mA（MCU 10 + OLED 12），14500 800 mAh ≈ 30 小时。" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;align=left;verticalAlign=top;spacingLeft=10;spacingTop=8;fontSize=11;lineHeight=150;" vertex="1" parent="1">
+          <mxGeometry x="40" y="520" width="520" height="410" as="geometry" />
+        </mxCell>
+
+        <mxCell id="footer" value="引脚来源：AI8051U 数据手册 4.1.7（LQFP48 列）；电路细节见 硬件设计.md" style="text;html=1;fontSize=10;align=left;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="620" y="950" width="700" height="24" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

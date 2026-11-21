@@ -98,7 +98,10 @@ void ShowIntDataWindow(void)
     OLED_UI_CreateWindow(&IntDataWindow);
 }
 
-/* Time Set edit windows, bind the staging values in watch_face.c */
+/* Time Set edit windows, bind the staging values in watch_face.c.
+ * Every Show*Window first calls Watch_TimeSet_Touch(field) so the field
+ * being edited starts from the live RTC value, not from the power on
+ * snapshot. field: 0 Year, 1 Month, 2 Day, 3 Hour, 4 Minute, 5 Second. */
 MenuWindow xdata WinTimeHour = {
     80, 28, 6.0f, WINDOW_ROUNDRECTANGLE,
     (char code *)"Hour", OLED_UI_FONT_12, 4, 3,
@@ -156,6 +159,7 @@ MenuWindow xdata TimeSetDoneWindow = {
  */
 void ShowTimeHourWindow(void)
 {
+    Watch_TimeSet_Touch(3);
     OLED_UI_CreateWindow(&WinTimeHour);
 }
 
@@ -164,6 +168,7 @@ void ShowTimeHourWindow(void)
  */
 void ShowTimeMinuteWindow(void)
 {
+    Watch_TimeSet_Touch(4);
     OLED_UI_CreateWindow(&WinTimeMinute);
 }
 
@@ -172,6 +177,7 @@ void ShowTimeMinuteWindow(void)
  */
 void ShowTimeSecondWindow(void)
 {
+    Watch_TimeSet_Touch(5);
     OLED_UI_CreateWindow(&WinTimeSecond);
 }
 
@@ -180,6 +186,7 @@ void ShowTimeSecondWindow(void)
  */
 void ShowTimeYearWindow(void)
 {
+    Watch_TimeSet_Touch(0);
     OLED_UI_CreateWindow(&WinTimeYear);
 }
 
@@ -188,6 +195,7 @@ void ShowTimeYearWindow(void)
  */
 void ShowTimeMonthWindow(void)
 {
+    Watch_TimeSet_Touch(1);
     OLED_UI_CreateWindow(&WinTimeMonth);
 }
 
@@ -196,6 +204,7 @@ void ShowTimeMonthWindow(void)
  */
 void ShowTimeDayWindow(void)
 {
+    Watch_TimeSet_Touch(2);
     OLED_UI_CreateWindow(&WinTimeDay);
 }
 
@@ -236,23 +245,6 @@ MenuWindow xdata WinCDownSec = {
     (char code *)"Second", OLED_UI_FONT_12, 4, 3,
     (float edata *)0, (int8_t edata *)0, &Watch_StageCountSec, (int32_t edata *)0, (long edata *)0,
     1.0f, 0.0f, 59.0f, 3, 4, 8, 0.0f
-};
-
-/* Alarm toggle feedback popups, text only. Width 80: side distance 8
- * leaves 64 px usable, "Alarm ON" = 8 * 7 px = 56 px and "Alarm OFF"
- * = 9 * 7 px = 63 px both fit (centered on 128: min x 32 >= 8). */
-MenuWindow xdata AlarmOnWindow = {
-    80, 28, 3.0f, WINDOW_ROUNDRECTANGLE,
-    (char code *)"Alarm ON", OLED_UI_FONT_12, 8, 3,
-    (float edata *)0, (int8_t edata *)0, (int16_t edata *)0, (int32_t edata *)0, (long edata *)0,
-    0.0f, 0.0f, 0.0f, 0, 0, 0, 0.0f
-};
-
-MenuWindow xdata AlarmOffWindow = {
-    80, 28, 3.0f, WINDOW_ROUNDRECTANGLE,
-    (char code *)"Alarm OFF", OLED_UI_FONT_12, 8, 3,
-    (float edata *)0, (int8_t edata *)0, (int16_t edata *)0, (int32_t edata *)0, (long edata *)0,
-    0.0f, 0.0f, 0.0f, 0, 0, 0, 0.0f
 };
 
 /* Zero-countdown guard popup, text only. "SET TIME!" = 9 * 7 px = 63,
@@ -297,19 +289,10 @@ void ShowCDownSecWindow(void)
 }
 
 /*
- * @brief Toggle the alarm and pop up the matching feedback window.
- */
-void AlarmToggleMenuCM(void)
-{
-    Watch_Alarm_Toggle();
-    OLED_UI_CreateWindow(Watch_Alarm_Enabled() != 0 ? &AlarmOnWindow : &AlarmOffWindow);
-}
-
-/*
  * @brief Countdown Start item: with a zero staging run time the start
  *        is blocked with the SET TIME! popup, otherwise the countdown
- *        app opens (Watch_Countdown_Open adopts the staging values
- *        and starts paused).
+ *        app opens. The reset drops a carried over remaining time first,
+ *        so Start! always arms the countdown from the staging values.
  */
 void CountDownStartMenuCM(void)
 {
@@ -319,6 +302,7 @@ void CountDownStartMenuCM(void)
     }
     else
     {
+        Watch_Countdown_Reset();
         Watch_OpenCountdown();
     }
 }
@@ -409,7 +393,7 @@ MenuItem xdata MainMenuItems[] = {
     {(char code *)"Up Timer", Watch_OpenUptimer, NULL, (unsigned char edata *)0, Image_uptime, 0.0f},
     {(char code *)"Dino Game", Watch_OpenDino, NULL, (unsigned char edata *)0, Image_dino, 0.0f},
     {(char code *)"Plane War", Watch_OpenPlane, NULL, (unsigned char edata *)0, Image_plane, 0.0f},
-    {(char code *)"More", NULL, &MoreMenuPage, (unsigned char edata *)0, Image_more, 0.0f},
+    {(char code *)"More...", NULL, &MoreMenuPage, (unsigned char edata *)0, Image_more, 0.0f},
     {(char code *)0, NULL, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f}
 };
 
@@ -711,9 +695,12 @@ MenuItem xdata SmallAreaMenuItems[] = {
     {(char code *)0, NULL, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f}
 };
 
+/* Main tiles menu.
+ * LineSpace 3: 32 px tile + 3 px gap = 35 px step, so the third tile
+ * keeps a visible slice on screen as a hint that the strip goes on. */
 MenuPage xdata MainMenuPage = {
     MENU_TYPE_TILES, SPEED, NOT_SHOW, UNLINEAR, OLED_UI_FONT_16,
-    NULL, MainMenuItems, 5, MainAuxFunc,
+    NULL, MainMenuItems, 3, MainAuxFunc,
     {0.0f, 0.0f, 0.0f, 0.0f}, 0, 0, 0, 0,
     128, 64, 32, 32,
     0, 0, {0.0f, 0.0f}, 0
@@ -841,7 +828,9 @@ MenuItem xdata AlarmMenuItems[] = {
     {(char code *)"[Back]", OLED_UI_Back, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
     {(char code *)"Hour", ShowAlarmHourWindow, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
     {(char code *)"Minute", ShowAlarmMinuteWindow, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
-    {(char code *)"ON / OFF", AlarmToggleMenuCM, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
+    /* Radio item: the box on the right shows the live alarm state, the
+     * framework flips the flag by itself, so no callback here. */
+    {(char code *)"ON / OFF", NULL, NULL, &ClkAlarmEnabled, (const uint8_t code *)0, 0.0f},
     {(char code *)0, NULL, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f}
 };
 

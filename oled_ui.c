@@ -23,8 +23,8 @@ MutexFlag edata FadeOutFlag = FLAGEND;
 MutexFlag edata WindowFlag = FLAGEND;
 /* Display mode, 1 is dark mode, 0 is light mode */
 unsigned char edata ColorMode = DARKMODE;
-/* Frame rate overlay switch */
-unsigned char edata OLED_UI_ShowFpsFlag = 1;
+/* Frame rate overlay switch, off by default, see Settings > Show FPS */
+unsigned char edata OLED_UI_ShowFpsFlag = 0;
 /* Screen brightness */
 int16_t edata OLED_UI_Brightness = 100;
 /* Popup window sustain timer */
@@ -452,14 +452,23 @@ void CurrentMenuPageInit(void)
     }
     else if (CurrentMenuPage->General_MenuType == MENU_TYPE_TILES)
     {
-        OLED_UI_PageStartPoint.TargetPoint.X = CurrentMenuPage->Tiles_ScreenWidth / 2 - CurrentMenuPage->Tiles_TileWidth / 2;
+        /* Keep the remembered tile instead of snapping back to item 0:
+         * the static initialiser already starts it at 0 for the very
+         * first entry, and every later entry reopens on the tile the
+         * user actually left (e.g. Calendar after leaving Calendar).
+         * The strip start is shifted by that index so the remembered
+         * tile lands in the centre slot, exactly where a manual move
+         * would have put it. */
+        OLED_UI_PageStartPoint.TargetPoint.X =
+            (float)(CurrentMenuPage->Tiles_ScreenWidth / 2 - CurrentMenuPage->Tiles_TileWidth / 2)
+            - (float)CurrentMenuPage->_ActiveMenuID *
+              (float)(CurrentMenuPage->Tiles_TileWidth + CurrentMenuPage->General_LineSpace);
         OLED_UI_PageStartPoint.TargetPoint.Y = TILES_STARTPOINT_Y;
         /* Start off screen so tiles fly in */
         OLED_UI_PageStartPoint.CurrentPoint.X = -50.0f;
         OLED_UI_PageStartPoint.CurrentPoint.Y = -(float)CurrentMenuPage->Tiles_TileWidth;
         OLED_UI_LineStep.CurrentDistance = 1.0f;
         OLED_UI_LineStep.TargetDistance = CurrentMenuPage->General_LineSpace;
-        CurrentMenuPage->_ActiveMenuID = 0;
     }
     /* Restart long text scroll from the beginning */
     SetLineSplitZero();
@@ -1034,6 +1043,7 @@ void PrintMenuElements(void)
     int16_t RadioCompensationWidth;
     int16_t StringLength;
     int16_t ScrollBarHeight;
+    int16_t ScrollBarX;
     char *RadioBoxSymb;
     MenuID i;
 
@@ -1151,11 +1161,12 @@ void PrintMenuElements(void)
             OLED_ShowImageArea(OLEDUI_CeilF(CursorPoint.X), OLEDUI_CeilF(CursorPoint.Y), page->Tiles_TileWidth, page->Tiles_TileHeight, 0, 0, page->Tiles_ScreenWidth, page->Tiles_ScreenHeight, page->General_MenuItems[i].Tiles_Icon == NULL ? UnKnown : page->General_MenuItems[i].Tiles_Icon);
             CursorPoint.X += (page->Tiles_TileWidth + OLED_UI_LineStep.CurrentDistance);
         }
-        if (IF_DRAW_ARROR == 1)
-        {
-            /* Arrow head above the tiles */
-            OLED_ShowImageArea(page->Tiles_ScreenWidth / 2 - 3, 0, 6, 5, 0, 0, page->Tiles_ScreenWidth, page->Tiles_ScreenHeight, Arrow);
-        }
+        /* Arrow head above the tiles, off by default (see IF_DRAW_ARROR).
+         * The preprocessor guard drops the draw call entirely, a plain
+         * constant test would leave dead code behind. */
+#if IF_DRAW_ARROR
+        OLED_ShowImageArea(page->Tiles_ScreenWidth / 2 - 3, 0, 6, 5, 0, 0, page->Tiles_ScreenWidth, page->Tiles_ScreenHeight, Arrow);
+#endif
         StringLength = CalcStringWidth(ChineseFont, ASCIIFont, "%s", page->General_MenuItems[page->_ActiveMenuID].General_item_text);
         /* Scroll the active label when wider than the screen */
         if (StringLength > page->Tiles_ScreenWidth)
@@ -1184,11 +1195,22 @@ void PrintMenuElements(void)
             page->Tiles_ScreenHeight - page->General_FontSize - TILES_BOTTOM_DISTANCE,
             ChineseFont, ASCIIFont,
             "%s", page->General_MenuItems[page->_ActiveMenuID].General_item_text);
-        /* Horizontal scrollbar below the tiles */
-        ScrollBarHeight = (page->Tiles_ScreenHeight >= 128 ? 5 : 3);
-        OLED_DrawRectangle(0, TILES_STARTPOINT_Y + page->Tiles_TileHeight + TILES_SCROLLBAR_Y,
-            OLEDUI_CeilF(OLED_UI_ScrollBarHeight.CurrentDistance), ScrollBarHeight, OLED_FILLED);
-        OLED_DrawLine(0, TILES_STARTPOINT_Y + page->Tiles_TileHeight + TILES_SCROLLBAR_Y + ScrollBarHeight / 2, page->Tiles_ScreenWidth - 1, TILES_STARTPOINT_Y + page->Tiles_TileHeight + TILES_SCROLLBAR_Y + ScrollBarHeight / 2);
+        /* Below the tiles: a thin track with a solid cursor block sitting
+         * on it. The block is one slot wide (14 px) and its x position is
+         * driven by _ActiveMenuID, so it reads as the selection cursor
+         * instead of a filling progress bar: item 0 parks it on the left
+         * edge, item 8 puts its right edge on the screen edge (114 + 14).
+         * The track is drawn first and the block over it, so the block
+         * really is the cursor, not a filled segment of the bar. */
+        ScrollBarHeight = (page->Tiles_ScreenHeight >= 128 ? 5 : 4);
+        ScrollBarX = (int16_t)((114UL * (unsigned long)page->_ActiveMenuID) / 8UL);
+        OLED_DrawLine(0,
+            TILES_STARTPOINT_Y + page->Tiles_TileHeight + TILES_SCROLLBAR_Y + ScrollBarHeight / 2,
+            page->Tiles_ScreenWidth - 1,
+            TILES_STARTPOINT_Y + page->Tiles_TileHeight + TILES_SCROLLBAR_Y + ScrollBarHeight / 2);
+        OLED_DrawRectangle(ScrollBarX,
+            TILES_STARTPOINT_Y + page->Tiles_TileHeight + TILES_SCROLLBAR_Y,
+            TILES_THUMB_WIDTH, ScrollBarHeight, OLED_FILLED);
     }
     if (page->General_ShowAuxiliaryFunction != NULL)
     {

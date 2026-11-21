@@ -6,12 +6,25 @@
  */
 
 #include "oled_driver.h"
+#include "oled_ui_driver.h"
 #include "set_io.h"
 #include "set_i2c.h"
 
 /* Display RAM mirror and color mode flag */
 unsigned char edata OLED_DisplayBuf[8][128];
 unsigned char OLED_ColorMode = 1;
+
+/* Last content actually clocked out to the panel, page by page. Lives in
+ * xdata (about 1KB) because edata is nearly exhausted; kept byte-identical
+ * to OLED_DisplayBuf right after each page transfer so OLED_Update can
+ * skip pages whose pixels did not change. */
+static unsigned char xdata OLEDShadowBuf[8][128];
+
+/* 1 = next OLED_Update must push all 8 pages regardless of the diff.
+ * Starts at 1 on purpose: SSD1306 GDDRAM holds random data after power up,
+ * so the very first frame has to be written in full, otherwise pages that
+ * happen to match the zeroed shadow would keep that garbage on screen. */
+static unsigned char xdata OLEDForceFull = 1;
 
 /* SSD1306 7-bit slave address shifted for write */
 #define OLED_I2C_ADDR_W 0x78
@@ -29,6 +42,18 @@ unsigned char OLED_ColorMode = 1;
 static unsigned char I2C_Wait(void)
 {
     unsigned long t;
+    /* Sample the quadrature encoder once per I2C step. The bus needs about
+     * 22us per byte at 400kHz and this routine runs once per SEND step and
+     * once per ACK step, so fast rotation is captured at roughly 40kHz
+     * instead of one sample per main loop frame. The call sits BEFORE the
+     * spin on purpose: the hardware is already clocking the byte while the
+     * pins are read, so the sample costs no extra bus time.
+     * Safe context: Encoder_FastPoll only reads P10/P11 and updates
+     * file-local statics, Encoder_Get is gated by enc_en (still 0 while
+     * OLED_Init runs ahead of Encoder_Init in main), and no interrupt
+     * handler anywhere calls I2C_Wait / OLED_WriteData / OLED_WriteCommand,
+     * so this can never re-enter itself. */
+    Encoder_FastPoll();
     t = 10000UL;
     while ((I2CMSST & 0x40) == 0)
     {
@@ -188,7 +213,15 @@ void OLED_WriteData(unsigned char edata *d, unsigned int n)
 
 void OLED_SetColorMode(unsigned char m)
 {
-    OLED_ColorMode = m;
+    /* Inversion is applied on the wire, not in the buffer, so a mode flip
+     * leaves OLED_DisplayBuf untouched and the page diff would see nothing
+     * to send (the dithering ring banner redraws identical text every
+     * phase). Force one full refresh whenever the mode really changes. */
+    if (m != OLED_ColorMode)
+    {
+        OLED_ColorMode = m;
+        OLEDForceFull = 1;
+    }
 }
 
 void OLED_SetCursor(unsigned char page, unsigned char x)
@@ -214,7 +247,40 @@ void OLED_Init(void)
         i++;
     }
     OLED_ClearBuf();
+    /* Panel GDDRAM is undefined at power on: the first frame must be pushed
+     * in full, never diffed against the all-zero shadow. */
+    OLEDForceFull = 1;
     OLED_Update();
+}
+
+/* Compare one page of the mirror against what the panel already holds.
+ * Returns 1 when any byte differs, i.e. when the page must be re-sent. */
+static unsigned char OLED_PageChanged(unsigned char p)
+{
+    unsigned char i;
+    i = 0;
+    while (i < 128)
+    {
+        if (OLED_DisplayBuf[p][i] != OLEDShadowBuf[p][i])
+        {
+            return 1;
+        }
+        i++;
+    }
+    return 0;
+}
+
+/* Copy one page of the mirror into the shadow after a successful transfer.
+ * Hand written loop: avoids pulling in a memcpy helper. */
+static void OLED_PageSync(unsigned char p)
+{
+    unsigned char i;
+    i = 0;
+    while (i < 128)
+    {
+        OLEDShadowBuf[p][i] = OLED_DisplayBuf[p][i];
+        i++;
+    }
 }
 
 void OLED_Update(void)
@@ -223,10 +289,15 @@ void OLED_Update(void)
     j = 0;
     while (j < 8)
     {
-        OLED_SetCursor(j, 0);
-        OLED_WriteData(OLED_DisplayBuf[j], 128);
+        if (OLEDForceFull != 0 || OLED_PageChanged(j) != 0)
+        {
+            OLED_SetCursor(j, 0);
+            OLED_WriteData(OLED_DisplayBuf[j], 128);
+            OLED_PageSync(j);
+        }
         j++;
     }
+    OLEDForceFull = 0;
 }
 
 void OLED_UpdateArea(unsigned char X, unsigned char Y, unsigned char W, unsigned char H)

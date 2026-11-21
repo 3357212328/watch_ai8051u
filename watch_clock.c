@@ -18,6 +18,28 @@
 /* 20 ms ticks per second */
 #define CLK_TPS  (50UL)
 
+/*
+ * Buzzer pin select. P5.0 is bonded out on LQFP48 only: manual 4.3.5 lists
+ * PDIP40 pin 25 for BOTH P2.4 and P5.0, while the PDIP40 pinout otherwise
+ * follows STC89C52 (P1.0=1 ... P2.4=25, XTAL=18/19, VCC=40, GND=20), where
+ * pin 25 is P2.4 - so P5.0 is simply not available on the 40-pin part.
+ * Boards built on AI8051U-PDIP40 set WATCH_BUZZ_P34 to 1 and wire the
+ * buzzer to P3.4 (PDIP40 pin 14). P3.4 is this project's spare pin: it is
+ * only the Timer0 clock input (T0), and no timer here uses an external
+ * clock. Default 0 keeps every existing board working unchanged.
+ */
+#ifndef WATCH_BUZZ_P34
+#define WATCH_BUZZ_P34 0
+#endif
+
+#if WATCH_BUZZ_P34
+#define BUZZ_IO   P34
+#define BUZZ_PIN  Pin34
+#else
+#define BUZZ_IO   P50
+#define BUZZ_PIN  Pin50
+#endif
+
 /* ===== ISR-context counters (drained behind EA) ======================== */
 static volatile unsigned long edata ClkAcc = 0;      /* generic 20ms fires */
 static volatile unsigned long edata ClkRingAcc = 0;  /* ring flash rhythm */
@@ -25,13 +47,14 @@ static volatile unsigned long edata ClkRingAcc = 0;  /* ring flash rhythm */
 /* ===== app state (xdata) =============================================== */
 static unsigned char xdata ClkBooted = 0;  /* EAXFR + P5.0 configured once */
 
-/* Alarm */
-static unsigned char xdata ClkAlarmEnabled = 0;
+/* Alarm on/off flag. Public because the menu binds it to a radio item,
+ * which stores an `unsigned char edata *` (oled_ui.h:303) and writes it
+ * with edata addressing, so this byte must live in edata, not xdata.
+ * Single byte read by the 20 ms ISR: no tearing. */
+unsigned char edata ClkAlarmEnabled = 0;
 static unsigned char xdata ClkAlarmLastH = 0xFF;   /* last ringed minute stamp */
 static unsigned char xdata ClkAlarmLastM = 0xFF;
 static unsigned char xdata ClkAlarmMatchCnt = 0;   /* consecutive match 20ms ticks */
-static unsigned char xdata ClkAlarmLastEnter = 1;
-static unsigned char xdata ClkAlarmLastBack = 1;
 
 /* Up-running timer */
 static unsigned char xdata ClkUpRunning = 0;
@@ -44,6 +67,8 @@ static unsigned char xdata ClkUpLastDown = 1;
 /* Countdown */
 static unsigned long xdata ClkCdRem = 0;           /* remaining 20ms ticks */
 static unsigned char xdata ClkCdRunning = 0;
+static unsigned char xdata ClkCdHold = 0;          /* 1 = Back left a remaining
+                                                    * value to keep on re-open */
 static unsigned char xdata ClkCdLastEnter = 1;
 static unsigned char xdata ClkCdLastBack = 1;
 static unsigned char xdata ClkCdLastUp = 1;        /* press-edge trackers */
@@ -77,12 +102,8 @@ static char code ClkCdRing[]   = "COUNT DOWN!";
 static char code ClkPressKey[] = "PRESS ANY KEY";
 static char code ClkRunTxt[]   = "RUNNING";
 static char code ClkPauseTxt[] = "PAUSED";
-static char code ClkOnTxt[]    = "ON";
-static char code ClkOffTxt[]   = "OFF";
-static char code ClkTitleAl[]  = "ALARM";
 static char code ClkTitleUp[]  = "UP TIMER";
 static char code ClkTitleCd[]  = "COUNT DOWN";
-static char code ClkHintAl[]   = "ENT:TOGGLE BACK:EXIT";
 static char code ClkHintUp[]   = "ENT:PAUSE UP:RESET";
 static char code ClkHintCd[]     = "ENT:PAUSE UP:RELOAD";  /* while running */
 static char code ClkHintCdIdle[] = "ENT:RUN UP:RELOAD";    /* while paused */
@@ -99,15 +120,15 @@ static char code ClkWkNames[7][3] =
 /* ===== small helpers =================================================== */
 
 /*
- * @brief Buzzer line P5.0: push-pull output, parked low. EAXFR is armed
+ * @brief Buzzer line (BUZZ_IO: P5.0 on LQFP48, P3.4 on PDIP40): push-pull output, parked low. EAXFR is armed
  *        beside it so Watch_ClockTick20's direct RTC reads always work
  *        (watch_time.c leaves EAXFR on after Init; we re-arm defensively).
  */
 static void Clk_PinInit(void)
 {
     EAXFR = 1;
-    set_io_mode(pp_mode, Pin50, Pin_End);
-    P50 = 0;
+    set_io_mode(pp_mode, BUZZ_PIN, Pin_End);
+    BUZZ_IO = 0;
 }
 
 /* Draw a code-space string centered on one row (advance = font width). */
@@ -322,7 +343,7 @@ unsigned char Watch_Ring_Active(void)
 /* Clears the flag and parks the buzzer line. */
 void Watch_Ring_Stop(void)
 {
-    P50 = 0;
+    BUZZ_IO = 0;
     ClkRingOn = 0;
 }
 
@@ -371,86 +392,19 @@ void Watch_Ring_Render(void)
     /* one bounded 2 kHz burst before presenting the frame */
     for (i = 0; i < 20; i++)
     {
-        P50 = 0;
+        BUZZ_IO = 0;
         Delay_us(250);
-        P50 = 1;
+        BUZZ_IO = 1;
         Delay_us(250);
     }
-    P50 = 0;
+    BUZZ_IO = 0;
     OLED_Update();
 }
 
 /* ===== alarm ============================================================ */
-
-void Watch_Alarm_Open(void)
-{
-    Clk_DrainAll();
-    /* Park the release-edge trackers with the live key state. */
-    ClkAlarmLastEnter = (unsigned char)(Key_GetEnterStatus() == 0);
-    ClkAlarmLastBack  = (unsigned char)(Key_GetBackStatus()  == 0);
-}
-
-/*
- * @brief 20 ms tick while the alarm page is open. Up/Down/encoder and
- *        their USB twins are drained and ignored; Enter (pulse or
- *        release edge) toggles the alarm via the same menu callback.
- *        Returns 1 on Back pulse or Back release edge.
- */
-unsigned char Watch_Alarm_Tick(void)
-{
-    unsigned char pressEnter, pressBack;
-    unsigned char usb_e, usb_b;
-
-    usb_e = USBCtrl_TakeEnter();
-    usb_b = USBCtrl_TakeBack();
-    USBCtrl_TakeUp();
-    USBCtrl_TakeDown();
-    USBCtrl_TakeEncoder();
-    Encoder_Get();
-
-    if (usb_b != 0) { return 1; }
-    pressEnter = (unsigned char)(Key_GetEnterStatus() == 0);
-    pressBack = (unsigned char)(Key_GetBackStatus() == 0);
-    if (pressBack == 0 && ClkAlarmLastBack != 0) { return 1; }
-    if (usb_e != 0 || (pressEnter == 0 && ClkAlarmLastEnter != 0))
-    {
-        Watch_Alarm_Toggle();
-    }
-    ClkAlarmLastEnter = pressEnter;
-    ClkAlarmLastBack = pressBack;
-    return 0;
-}
-
-void Watch_Alarm_Render(void)
-{
-    unsigned char h, m;
-
-    h = (unsigned char)Watch_StageAlarmHour;
-    m = (unsigned char)Watch_StageAlarmMinute;
-    if (h > 23) { h = 23; }
-    if (m > 59) { m = 59; }
-
-    OLED_SetColorMode(ColorMode);
-    OLED_Brightness(OLED_UI_Brightness);
-    OLED_Clear();
-    Clk_DrawC(ClkTitleAl, OLED_10X20_HALF, 2);
-    Clk_FillMMSS(h, m);
-    OLED_ShowString(39, 26, ClkBuf, OLED_10X20_HALF);
-    Clk_DrawC((ClkAlarmEnabled != 0) ? ClkOnTxt : ClkOffTxt, OLED_6X8_HALF, 47);
-    Clk_DrawC(ClkHintAl, OLED_6X8_HALF, 56);
-    OLED_Update();
-}
-
-void Watch_Alarm_Toggle(void)
-{
-    if (ClkAlarmEnabled != 0) { ClkAlarmEnabled = 0; }
-    else { ClkAlarmEnabled = 1; }
-}
-
-unsigned char Watch_Alarm_Enabled(void)
-{
-    return ClkAlarmEnabled;
-}
+/* Flag only: the alarm STATUS page is gone (nothing ever entered APP_ALARM,
+ * so its renderer and tick were dead weight) and the ON/OFF state is now
+ * shown by the menu radio item bound to ClkAlarmEnabled. */
 
 /* ===== up-running timer ================================================= */
 
@@ -460,6 +414,25 @@ void Watch_Uptimer_Open(void)
     Clk_DrainAcc();
     ClkUpRunning = 0;
     ClkUpTicks = 0;
+    ClkUpLastEnter = (unsigned char)(Key_GetEnterStatus() == 0);
+    ClkUpLastBack  = (unsigned char)(Key_GetBackStatus()  == 0);
+    ClkUpLastUp    = (unsigned char)(Key_GetUpStatus()    == 0);
+    ClkUpLastDown  = (unsigned char)(Key_GetDownStatus()  == 0);
+}
+
+/*
+ * @brief Re-park the up timer after a ring hijack without losing the
+ *        accumulated ticks: drops the virtual keys/encoder queued
+ *        during the ring and re-parks the four edge trackers.
+ *        ClkUpTicks / ClkUpRunning are untouched, and the 20 ms fires
+ *        are deliberately NOT drained: like the stopwatch (whose time
+ *        base is the same ISR counter), a count-up timer must keep
+ *        counting through the alarm, so the first tick after the
+ *        banner adds the interrupted interval.
+ */
+void Watch_Uptimer_Park(void)
+{
+    Clk_DrainAll();          /* discard ring-period virtual keys/encoder */
     ClkUpLastEnter = (unsigned char)(Key_GetEnterStatus() == 0);
     ClkUpLastBack  = (unsigned char)(Key_GetBackStatus()  == 0);
     ClkUpLastUp    = (unsigned char)(Key_GetUpStatus()    == 0);
@@ -538,8 +511,9 @@ void Watch_Uptimer_Render(void)
     unsigned long sec;
     unsigned int mm, ss;
 
-    sec = ClkUpTicks / CLK_TPS;
-    if (sec > 5999UL) { sec = 5999UL; }
+    /* Display wraps every 100 minutes instead of freezing at 99:59;
+     * the internal tick count (ClkUpTicks) still accumulates fully. */
+    sec = (ClkUpTicks / CLK_TPS) % 6000UL;
     mm = (unsigned int)(sec / 60UL);
     ss = (unsigned int)(sec % 60UL);
     Clk_PageMMSS(ClkTitleUp, ClkHintUp, (unsigned char)mm, (unsigned char)ss,
@@ -548,16 +522,56 @@ void Watch_Uptimer_Render(void)
 
 /* ===== countdown ======================================================== */
 
+/*
+ * @brief Enter the countdown page. A fresh entry adopts the staged
+ *        Minute/Second values (paused); after a Back exit the remaining
+ *        ticks are kept (ClkCdHold), so re-entering resumes instead of
+ *        reloading. Use Watch_Countdown_Reset() for an explicit reload.
+ */
 void Watch_Countdown_Open(void)
 {
     Clk_DrainAll();
     Clk_DrainAcc();
-    ClkCdRem = Clk_StagedTicks();
-    ClkCdRunning = 0;
+    if (ClkCdHold != 0)
+    {
+        /* Coming back from a Back exit: keep ClkCdRem, stay paused. */
+        ClkCdHold = 0;
+        ClkCdRunning = 0;
+    }
+    else
+    {
+        ClkCdRem = Clk_StagedTicks();
+        ClkCdRunning = 0;
+    }
     ClkCdLastEnter = (unsigned char)(Key_GetEnterStatus() == 0);
     ClkCdLastBack  = (unsigned char)(Key_GetBackStatus()  == 0);
     ClkCdLastUp    = (unsigned char)(Key_GetUpStatus()    == 0);
     ClkCdLastDown  = (unsigned char)(Key_GetDownStatus()  == 0);
+}
+
+/*
+ * @brief Re-park the countdown after a ring hijack without losing the
+ *        remaining ticks: drains queued input + stale 20 ms fires and
+ *        re-parks the edge trackers. ClkCdRem / ClkCdRunning are kept.
+ */
+void Watch_Countdown_Park(void)
+{
+    Clk_DrainAll();          /* discard ring-period virtual keys/encoder */
+    Clk_DrainAcc();          /* discard ring-period 20 ms fires */
+    ClkCdLastEnter = (unsigned char)(Key_GetEnterStatus() == 0);
+    ClkCdLastBack  = (unsigned char)(Key_GetBackStatus()  == 0);
+    ClkCdLastUp    = (unsigned char)(Key_GetUpStatus()    == 0);
+    ClkCdLastDown  = (unsigned char)(Key_GetDownStatus()  == 0);
+}
+
+/*
+ * @brief Explicit reload from the staged Minute/Second value (menu
+ *        "Start!" item). Drops any held remaining time.
+ */
+void Watch_Countdown_Reset(void)
+{
+    ClkCdHold = 0;
+    ClkCdRem = Clk_StagedTicks();
 }
 
 /*
@@ -620,7 +634,13 @@ unsigned char Watch_Countdown_Tick(void)
     ClkCdLastUp = pressUp;
     ClkCdLastDown = pressDown;
 
-    if (exitReq != 0) { return 1; }
+    if (exitReq != 0)
+    {
+        /* Remember that the remaining ticks must survive the exit, so
+         * Watch_Countdown_Open() resumes instead of reloading staging. */
+        ClkCdHold = 1;
+        return 1;
+    }
 
     EA = 0;
     n = ClkAcc;
@@ -714,15 +734,34 @@ unsigned char Watch_Calendar_Tick(void)
  */
 void Watch_Calendar_Render(void)
 {
-    unsigned char w, dim, d, col, row, i, nlen;
+    unsigned char w, dim, d, col, row, i, nlen, rows, pitch;
     uint16_t x;
-    int16_t y;
+    int16_t y, dateY, hdrY, titleY;
 
     WatchTime_Read(&ClkCalTime);
 
     OLED_SetColorMode(ColorMode);
     OLED_Brightness(OLED_UI_Brightness);
     OLED_Clear();
+
+    /* Grid geometry. rows is how many week rows this month needs (4..6).
+     * A 5-row month gets a 9 px row pitch, one pixel of leading between
+     * the 8 px glyph cells. A 6-row month falls back to 8 px pitch and
+     * starts 2 px higher so the last row still ends inside the panel.
+     * The old layout always used 7 px, i.e. glyph cells overlapped by a
+     * pixel, which is what made the dates look crammed. */
+    w = Clk_Weekday((int16_t)(2000 + (unsigned int)ClkCalYear2),
+                    ClkCalMonth, 1);
+    dim = WatchTime_DaysInMonth(ClkCalYear2, ClkCalMonth);
+    rows = (unsigned char)(((uint16_t)w + (uint16_t)dim + 6U) / 7U);
+    if (rows <= 5U)
+    {
+        titleY = 1; hdrY = 10; dateY = 19; pitch = 9;
+    }
+    else
+    {
+        titleY = 0; hdrY = 8; dateY = 16; pitch = 8;
+    }
 
     /* title: "OCTOBER 2026" */
     nlen = (unsigned char)Clk_Copy(ClkMoNames[ClkCalMonth - 1]);
@@ -733,7 +772,7 @@ void Watch_Calendar_Render(void)
     ClkBuf[nlen++] = (char)('0' + ClkCalYear2 % 10U);
     ClkBuf[nlen] = '\0';
     x = (128U - (uint16_t)nlen * 6U) / 2U;
-    OLED_ShowString((int16_t)x, 1, ClkBuf, OLED_6X8_HALF);
+    OLED_ShowString((int16_t)x, titleY, ClkBuf, OLED_6X8_HALF);
 
     /* weekday header, Monday first */
     for (i = 0; i < 7; i++)
@@ -741,20 +780,16 @@ void Watch_Calendar_Render(void)
         ClkBuf[0] = ClkWkNames[i][0];
         ClkBuf[1] = ClkWkNames[i][1];
         ClkBuf[2] = '\0';
-        OLED_ShowString((int16_t)((uint16_t)i * 18U + 4U), 11, ClkBuf,
+        OLED_ShowString((int16_t)((uint16_t)i * 18U + 4U), hdrY, ClkBuf,
                         OLED_6X8_HALF);
     }
-
-    w = Clk_Weekday((int16_t)(2000 + (unsigned int)ClkCalYear2),
-                    ClkCalMonth, 1);
-    dim = WatchTime_DaysInMonth(ClkCalYear2, ClkCalMonth);
 
     for (d = 1; d <= dim; d++)
     {
         col = (unsigned char)(((uint16_t)w + (uint16_t)d - 1U) % 7U);
         row = (unsigned char)(((uint16_t)w + (uint16_t)d - 1U) / 7U);
         x = (uint16_t)col * 18U + 4U;
-        y = (int16_t)(21U + (uint16_t)row * 7U);
+        y = (int16_t)((uint16_t)dateY + (uint16_t)row * (uint16_t)pitch);
         ClkBuf[0] = (char)('0' + d / 10U);
         ClkBuf[1] = (char)('0' + d % 10U);
         ClkBuf[2] = '\0';
@@ -767,7 +802,7 @@ void Watch_Calendar_Render(void)
         col = (unsigned char)(((uint16_t)w + (uint16_t)ClkCalTime.Day - 1U) % 7U);
         row = (unsigned char)(((uint16_t)w + (uint16_t)ClkCalTime.Day - 1U) / 7U);
         x = (uint16_t)col * 18U + 4U;
-        y = (int16_t)(21U + (uint16_t)row * 7U);
+        y = (int16_t)((uint16_t)dateY + (uint16_t)row * (uint16_t)pitch);
         OLED_DrawRectangle((int16_t)x, (int16_t)(y + 7), 12, 1, 1);
     }
 

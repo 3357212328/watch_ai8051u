@@ -34,6 +34,10 @@ extern uint8_t edata OLED_DisplayBuf[OLED_HEIGHT / 8][OLED_WIDTH];
 /* Tiles menu: scrollbar Y offset below tiles */
 #define TILES_SCROLLBAR_Y           (4)
 
+/* Tiles menu: width of the fixed thumb, one slot of the 9 item main menu.
+ * The 9 slots span 114 px (0..114), thumb 14 px ends on the right edge. */
+#define TILES_THUMB_WIDTH           (14)
+
 /* Tiles menu: label distance from screen bottom */
 #define TILES_BOTTOM_DISTANCE       (0)
 
@@ -41,8 +45,10 @@ extern uint8_t edata OLED_DisplayBuf[OLED_HEIGHT / 8][OLED_WIDTH];
  * Smaller is slower. Use fractions of 1 (eg 0.5). */
 #define LINE_SLIP_SPEED             (0.5f)
 
-/* Draw arrow head above tiles menu */
-#define IF_DRAW_ARROR               (1)
+/* Draw arrow head above tiles menu.
+ * Disabled: the arrow sits dead center and does not tell the user that
+ * more tiles wait off screen, the partial next tile plus the slider do. */
+#define IF_DRAW_ARROR               (0)
 
 /* Line prefix symbols */
 #define FUNCTION_PREFIX             ("~")

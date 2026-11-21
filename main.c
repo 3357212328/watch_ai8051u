@@ -11,6 +11,7 @@
 #include "usb_ctrl.h"
 #include "set_timer.h"
 #include "watch_face.h"
+#include "watch_time.h"
 
 /* Watch app on the OLED_UI framework:
  * Boot into the digital watch face (on-chip RTC, internal IRC32K).
@@ -31,13 +32,21 @@ void main(void)
     TFPU_Init120MHz();
     USBCtrl_Init();
     EA = 1;
+    /* Ports first, app state second. Watch_Init() parks its release-edge
+     * trackers with the live pin state; reading P3.2/P1.0/P1.1 before
+     * Key_Init/Encoder_Init enables the pull-ups samples a floating
+     * high-Z pin. If that reads low, the first 20 ms tick sees a
+     * "released" key and opens the menu straight from boot.
+     * EAXFR stays on: set_io_mode() reaches PxPU through the XSFR
+     * window, and WatchTime_Init() is no longer the one arming it. */
+    EAXFR = 1;
+    Key_Init();
+    Encoder_Init();
     Watch_Init();
     /* Same hardware bring-up as OLED_UI_Init, without page select:
      * the watch face is the boot mode, the menu opens on demand. */
     OLED_Init();
     Timer_Init();
-    Key_Init();
-    Encoder_Init();
 
     while (1)
     {
@@ -48,6 +57,10 @@ void main(void)
         if (get_timer_state(Timer11) != 0)
         {
             Watch_Tick();
+            /* Follow the PC clock while a USB host is present, and apply
+             * the manual drift trim when running standalone. */
+            WatchTime_Discipline();
+            WatchTime_TrimTick();
         }
         Watch_Render();
     }

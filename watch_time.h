@@ -31,6 +31,22 @@ void WatchTime_Read(WatchTime *t);
  * The RTC must already be running (WatchTime_Init called once). */
 void WatchTime_Set(const WatchTime *t);
 
+/* Discipline the RTC against the USB host frame counter (1 SOF per ms,
+ * 11-bit FRAME1/FRAME2 in the SIE). The internal IRC32K drifts by about
+ * -0.9%..+1.1% over -20..65 C, i.e. up to ~40 s per hour, which is the
+ * bulk of any "clock is a minute off" report. While a host is attached
+ * the drift is measured and removed one second at a time; with no SOF
+ * packets (charger, unplugged) this is a no-op and the RC free-runs.
+ * Call once per 20 ms UI tick. */
+void WatchTime_Discipline(void);
+
+/* Manual drift trim for standalone use (no USB host, no crystal): set
+ * WATCH_TRIM_SPD in watch_time.c to the measured error in seconds per
+ * day, positive when the clock runs fast. 0 turns it off. Compile-time
+ * only: this build uses the whole 64K code space, so there is no EEPROM
+ * sector left to persist a run-time value in. */
+void WatchTime_TrimTick(void);
+
 /* Number of days in month (1..12) of year 20xx (0..99), leap aware. */
 uint8_t WatchTime_DaysInMonth(uint8_t year2, uint8_t month);
 
