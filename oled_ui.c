@@ -7,8 +7,6 @@
  * precision (TFPU accelerated), 32-bit mul/div is MDU accelerated.
  */
 
-/* Frame rate counter */
-OLED_UI_Counter edata OLED_FPS = {0, 0, 0};
 /* Debounced key states, 1 means released */
 OLED_Key edata OLED_UI_Key = {1, 1, 1, 1};
 OLED_Key edata OLED_UI_LastKey = {1, 1, 1, 1};
@@ -23,8 +21,6 @@ MutexFlag edata FadeOutFlag = FLAGEND;
 MutexFlag edata WindowFlag = FLAGEND;
 /* Display mode, 1 is dark mode, 0 is light mode */
 unsigned char edata ColorMode = DARKMODE;
-/* Frame rate overlay switch, off by default, see Settings > Show FPS */
-unsigned char edata OLED_UI_ShowFpsFlag = 0;
 /* Screen brightness */
 int16_t edata OLED_UI_Brightness = 100;
 /* Popup window sustain timer */
@@ -79,38 +75,6 @@ int16_t OLEDUI_CeilF(float v)
         t++;
     }
     return t;
-}
-
-/*
- * @brief Sample the frame rate. Call once per 20 ms tick, the result
- *        lands in OLED_FPS.value.
- */
-void GetFPS(void)
-{
-    if (OLED_FPS.step < 49)
-    {
-        OLED_FPS.step++;
-    }
-    else
-    {
-        OLED_FPS.step = 0;
-        OLED_FPS.value = OLED_FPS.count;
-        OLED_FPS.count = 0;
-    }
-}
-
-/*
- * @brief Count one rendered frame and draw the FPS overlay.
- *        Call once per main loop.
- */
-void OLED_UI_ShowFPS(void)
-{
-    OLED_FPS.count++;
-
-    if (OLED_UI_ShowFpsFlag)
-    {
-        OLED_Printf(OLED_WIDTH - CalcStringWidth(OLED_8X8_FULL, OLED_6X8_HALF, "%d", OLED_FPS.value), 0, OLED_6X8_HALF, "%d", OLED_FPS.value);
-    }
 }
 
 /*
@@ -687,14 +651,14 @@ void OLED_DrawWindow(void)
             {
                 MaxLength = OLEDUI_CeilF(OLED_UI_Window.CurrentArea.Width) - 2 * CurrentWindow->Text_FontSideDistance - CalcStringWidth(ChineseFont, ASCIIFont, OU_FLOAT_FMT, *CurrentWindow->Prob_Data_Float) - WINDOW_DATA_TEXT_DISTANCE;
                 DataLength = CalcStringWidth(ChineseFont, ASCIIFont, OU_FLOAT_FMT, *CurrentWindow->Prob_Data_Float);
-                OLED_PrintfMixArea(
+                OLED_PrintfArea(
                     OLEDUI_CeilF(OLED_UI_Window.CurrentArea.X),
                     OLEDUI_CeilF(OLED_UI_Window.CurrentArea.Y),
                     OLEDUI_CeilF(OLED_UI_Window.CurrentArea.Width),
                     OLEDUI_CeilF(OLED_UI_Window.CurrentArea.Height),
                     OLEDUI_CeilF(OLED_UI_Window.CurrentArea.X) + CurrentWindow->General_Width - 1 - CurrentWindow->Text_FontSideDistance - DataLength,
                     OLEDUI_CeilF(OLED_UI_Window.CurrentArea.Y) + CurrentWindow->Text_FontTopDistance,
-                    ChineseFont, ASCIIFont,
+                    ASCIIFont,
                     OU_FLOAT_FMT, *CurrentWindow->Prob_Data_Float);
             }
             else
@@ -704,54 +668,54 @@ void OLED_DrawWindow(void)
                     case WINDOW_DATA_STYLE_INT8:
                         MaxLength = OLEDUI_CeilF(OLED_UI_Window.CurrentArea.Width) - 2 * CurrentWindow->Text_FontSideDistance - CalcStringWidth(ChineseFont, ASCIIFont, "%d", *CurrentWindow->Prob_Data_Int_8) - WINDOW_DATA_TEXT_DISTANCE;
                         DataLength = CalcStringWidth(ChineseFont, ASCIIFont, "%d", *CurrentWindow->Prob_Data_Int_8);
-                        OLED_PrintfMixArea(
+                        OLED_PrintfArea(
                             OLEDUI_CeilF(OLED_UI_Window.CurrentArea.X),
                             OLEDUI_CeilF(OLED_UI_Window.CurrentArea.Y),
                             OLEDUI_CeilF(OLED_UI_Window.CurrentArea.Width),
                             OLEDUI_CeilF(OLED_UI_Window.CurrentArea.Height),
                             OLEDUI_CeilF(OLED_UI_Window.CurrentArea.X) + CurrentWindow->General_Width - 1 - CurrentWindow->Text_FontSideDistance - DataLength,
                             OLEDUI_CeilF(OLED_UI_Window.CurrentArea.Y) + CurrentWindow->Text_FontTopDistance,
-                            ChineseFont, ASCIIFont,
+                            ASCIIFont,
                             "%d", *CurrentWindow->Prob_Data_Int_8);
                         break;
                     case WINDOW_DATA_STYLE_INT16:
                         MaxLength = OLEDUI_CeilF(OLED_UI_Window.CurrentArea.Width) - 2 * CurrentWindow->Text_FontSideDistance - CalcStringWidth(ChineseFont, ASCIIFont, "%d", *CurrentWindow->Prob_Data_Int_16) - WINDOW_DATA_TEXT_DISTANCE;
                         DataLength = CalcStringWidth(ChineseFont, ASCIIFont, "%d", *CurrentWindow->Prob_Data_Int_16);
-                        OLED_PrintfMixArea(
+                        OLED_PrintfArea(
                             OLEDUI_CeilF(OLED_UI_Window.CurrentArea.X),
                             OLEDUI_CeilF(OLED_UI_Window.CurrentArea.Y),
                             OLEDUI_CeilF(OLED_UI_Window.CurrentArea.Width),
                             OLEDUI_CeilF(OLED_UI_Window.CurrentArea.Height),
                             OLEDUI_CeilF(OLED_UI_Window.CurrentArea.X) + CurrentWindow->General_Width - 1 - CurrentWindow->Text_FontSideDistance - DataLength,
                             OLEDUI_CeilF(OLED_UI_Window.CurrentArea.Y) + CurrentWindow->Text_FontTopDistance,
-                            ChineseFont, ASCIIFont,
+                            ASCIIFont,
                             "%d", *CurrentWindow->Prob_Data_Int_16);
                         break;
                     case WINDOW_DATA_STYLE_INT32:
                         MaxLength = OLEDUI_CeilF(OLED_UI_Window.CurrentArea.Width) - 2 * CurrentWindow->Text_FontSideDistance - CalcStringWidth(ChineseFont, ASCIIFont, "%ld", *CurrentWindow->Prob_Data_Int_32) - WINDOW_DATA_TEXT_DISTANCE;
                         DataLength = CalcStringWidth(ChineseFont, ASCIIFont, "%ld", *CurrentWindow->Prob_Data_Int_32);
-                        OLED_PrintfMixArea(
+                        OLED_PrintfArea(
                             OLEDUI_CeilF(OLED_UI_Window.CurrentArea.X),
                             OLEDUI_CeilF(OLED_UI_Window.CurrentArea.Y),
                             OLEDUI_CeilF(OLED_UI_Window.CurrentArea.Width),
                             OLEDUI_CeilF(OLED_UI_Window.CurrentArea.Height),
                             OLEDUI_CeilF(OLED_UI_Window.CurrentArea.X) + CurrentWindow->General_Width - 1 - CurrentWindow->Text_FontSideDistance - DataLength,
                             OLEDUI_CeilF(OLED_UI_Window.CurrentArea.Y) + CurrentWindow->Text_FontTopDistance,
-                            ChineseFont, ASCIIFont,
+                            ASCIIFont,
                             "%ld", *CurrentWindow->Prob_Data_Int_32);
                         break;
                     case WINDOW_DATA_STYLE_INT64:
                         /* 32-bit long on C251, same range as INT32 */
                         MaxLength = OLEDUI_CeilF(OLED_UI_Window.CurrentArea.Width) - 2 * CurrentWindow->Text_FontSideDistance - CalcStringWidth(ChineseFont, ASCIIFont, "%ld", *CurrentWindow->Prob_Data_Int_64) - WINDOW_DATA_TEXT_DISTANCE;
                         DataLength = CalcStringWidth(ChineseFont, ASCIIFont, "%ld", *CurrentWindow->Prob_Data_Int_64);
-                        OLED_PrintfMixArea(
+                        OLED_PrintfArea(
                             OLEDUI_CeilF(OLED_UI_Window.CurrentArea.X),
                             OLEDUI_CeilF(OLED_UI_Window.CurrentArea.Y),
                             OLEDUI_CeilF(OLED_UI_Window.CurrentArea.Width),
                             OLEDUI_CeilF(OLED_UI_Window.CurrentArea.Height),
                             OLEDUI_CeilF(OLED_UI_Window.CurrentArea.X) + CurrentWindow->General_Width - 1 - CurrentWindow->Text_FontSideDistance - DataLength,
                             OLEDUI_CeilF(OLED_UI_Window.CurrentArea.Y) + CurrentWindow->Text_FontTopDistance,
-                            ChineseFont, ASCIIFont,
+                            ASCIIFont,
                             "%ld", *CurrentWindow->Prob_Data_Int_64);
                         break;
                     default:
@@ -791,14 +755,14 @@ void OLED_DrawWindow(void)
                 CurrentWindow->_LineSlip = MaxLength + 1;
             }
 
-            OLED_PrintfMixArea(
+            OLED_PrintfArea(
                 OLEDUI_CeilF(OLED_UI_Window.CurrentArea.X) + CurrentWindow->Text_FontSideDistance,
                 OLEDUI_CeilF(OLED_UI_Window.CurrentArea.Y) + CurrentWindow->Text_FontTopDistance,
                 MaxLength,
                 OLEDUI_CeilF(OLED_UI_Window.CurrentArea.Height),
                 OLEDUI_CeilF(OLED_UI_Window.CurrentArea.X) + CurrentWindow->Text_FontSideDistance + OLEDUI_CeilF(CurrentWindow->_LineSlip),
                 OLEDUI_CeilF(OLED_UI_Window.CurrentArea.Y) + CurrentWindow->Text_FontTopDistance,
-                ChineseFont, ASCIIFont, "%s", CurrentWindow->Text_String);
+                ASCIIFont, "%s", CurrentWindow->Text_String);
         }
     }
     else
@@ -986,7 +950,7 @@ void SetTargetProbWidth(void)
  * @brief Draw the prefix symbol of one list row.
  *        Submenu ">", callback "~", radio "*", plain "-".
  */
-void DrawLinePermix(MenuPage *page, MenuID i, OLED_Point *CursorPoint, OLED_Font ChineseFont, OLED_Font ASCIIFont)
+void DrawLinePermix(MenuPage *page, MenuID i, OLED_Point *CursorPoint, OLED_Font ASCIIFont)
 {
     char *LinePerfixSymb;
     LinePerfixSymb = "";
@@ -1009,14 +973,14 @@ void DrawLinePermix(MenuPage *page, MenuID i, OLED_Point *CursorPoint, OLED_Font
             LinePerfixSymb = NONE_PREFIX;
         }
 
-        OLED_PrintfMixArea(
+        OLED_PrintfArea(
             OLEDUI_CeilF(OLED_UI_MenuFrame.CurrentArea.X),
             OLEDUI_CeilF(OLED_UI_MenuFrame.CurrentArea.Y),
             OLEDUI_CeilF(OLED_UI_MenuFrame.CurrentArea.Width) - 6,
             OLEDUI_CeilF(OLED_UI_MenuFrame.CurrentArea.Height),
             OLEDUI_CeilF(CursorPoint->X),
             OLEDUI_CeilF(CursorPoint->Y),
-            ChineseFont, ASCIIFont,
+            ASCIIFont,
             "%s", LinePerfixSymb);
     }
 }
@@ -1076,7 +1040,7 @@ void PrintMenuElements(void)
 
             StringLength = CalcStringWidth(ChineseFont, ASCIIFont, "%s", page->General_MenuItems[i].General_item_text);
 
-            DrawLinePermix(page, i, &CursorPoint, ChineseFont, ASCIIFont);
+            DrawLinePermix(page, i, &CursorPoint, ASCIIFont);
 
             /* Radio box on the right edge */
             if (page->General_MenuItems[i].List_BoolRadioBox != NULL)
@@ -1092,14 +1056,14 @@ void PrintMenuElements(void)
                     RadioBoxSymb = "[ ]";
                 }
 
-                OLED_PrintfMixArea(
+                OLED_PrintfArea(
                     OLEDUI_CeilF(TempTargetArea.CurrentArea.X),
                     OLEDUI_CeilF(TempTargetArea.CurrentArea.Y),
                     OLEDUI_CeilF(TempTargetArea.CurrentArea.Width) - 6,
                     OLEDUI_CeilF(TempTargetArea.CurrentArea.Height),
                     OLEDUI_CeilF(CursorPoint.X) + OLEDUI_CeilF(TempTargetArea.CurrentArea.Width) - RadioCompensationWidth - 9,
                     OLEDUI_CeilF(CursorPoint.Y),
-                    ChineseFont, ASCIIFont,
+                    ASCIIFont,
                     "%s", RadioBoxSymb);
             }
             else
@@ -1128,13 +1092,13 @@ void PrintMenuElements(void)
                 }
             }
 
-            OLED_PrintfMixArea(OLEDUI_CeilF(TempTargetArea.CurrentArea.X) + LinePerfixWidth + CurrentMenuPage->List_StartPointX,
+            OLED_PrintfArea(OLEDUI_CeilF(TempTargetArea.CurrentArea.X) + LinePerfixWidth + CurrentMenuPage->List_StartPointX,
                 OLEDUI_CeilF(TempTargetArea.CurrentArea.Y),
                 OLEDUI_CeilF(TempTargetArea.CurrentArea.Width) - 6 - LinePerfixWidth - CurrentMenuPage->List_StartPointX - 2 - RadioCompensationWidth,
                 OLEDUI_CeilF(TempTargetArea.CurrentArea.Height),
                 OLEDUI_CeilF(CursorPoint.X + LinePerfixWidth + page->General_MenuItems[i]._LineSlip),
                 OLEDUI_CeilF(CursorPoint.Y),
-                ChineseFont, ASCIIFont, "%s", page->General_MenuItems[i].General_item_text);
+                ASCIIFont, "%s", page->General_MenuItems[i].General_item_text);
 
             CursorPoint.Y += (page->General_FontSize + OLED_UI_LineStep.CurrentDistance);
         }
@@ -1186,10 +1150,10 @@ void PrintMenuElements(void)
             page->General_MenuItems[page->_ActiveMenuID]._LineSlip = page->Tiles_ScreenWidth + 1;
         }
 
-        OLED_PrintfMixArea(0, 0, page->Tiles_ScreenWidth, page->Tiles_ScreenHeight,
+        OLED_PrintfArea(0, 0, page->Tiles_ScreenWidth, page->Tiles_ScreenHeight,
             StringLength > page->Tiles_ScreenWidth ? OLEDUI_CeilF(page->General_MenuItems[page->_ActiveMenuID]._LineSlip) : page->Tiles_ScreenWidth / 2 - CalcStringWidth(ChineseFont, ASCIIFont, "%s", page->General_MenuItems[page->_ActiveMenuID].General_item_text) / 2 + OLEDUI_CeilF(page->General_MenuItems[page->_ActiveMenuID]._LineSlip),
             page->Tiles_ScreenHeight - page->General_FontSize - TILES_BOTTOM_DISTANCE,
-            ChineseFont, ASCIIFont,
+            ASCIIFont,
             "%s", page->General_MenuItems[page->_ActiveMenuID].General_item_text);
         /* Below the tiles: a thin track with a solid cursor block sitting
          * on it. The block is one slot wide (14 px) and its x position is
@@ -1705,7 +1669,6 @@ void OLED_UI_MainLoop(void)
 
     RunCurrentCallBackFunction();
 
-    OLED_UI_ShowFPS();
     OLED_Update();
 }
 
@@ -1720,7 +1683,6 @@ void OLED_UI_InterruptHandler(void)
     MenuID_Type IncreaseID;
     int16_t i;
     unsigned char IdleActivity;
-    GetFPS();
     window = CurrentWindow;
     IdleActivity = 0;
     /* Skip input while a callback or transition owns the UI */

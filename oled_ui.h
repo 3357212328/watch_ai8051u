@@ -313,7 +313,6 @@ extern OLED_ChangeDistance xdata OLED_UI_ScrollBarHeight;
 extern OLED_ChangeDistance xdata OLED_UI_ProbWidth;
 extern OLED_ChangePoint xdata OLED_UI_PageStartPoint;
 extern OLED_ChangeDistance xdata OLED_UI_LineStep;
-extern OLED_UI_Counter edata OLED_FPS;
 extern OLED_Key edata OLED_UI_Key;
 extern OLED_Key edata OLED_UI_LastKey;
 extern MenuPage * edata CurrentMenuPage;
@@ -322,23 +321,16 @@ extern MutexFlag edata KeyEnterFlag;
 extern MutexFlag edata FadeOutFlag;
 extern MutexFlag edata WindowFlag;
 extern unsigned char edata ColorMode;
-extern unsigned char edata OLED_UI_ShowFpsFlag;
 extern int16_t edata OLED_UI_Brightness;
 extern OLED_UI_WindowSustainCounter edata OLED_SustainCounter;
 extern int16_t edata WindowProbDeltaData;
 
 /**************** menu data (defined in oled_ui_menudata.c) ****************/
-extern float edata testfloatnum;
-extern long edata testintnum;
 extern MenuItem xdata MainMenuItems[];
 extern MenuItem xdata SettingsMenuItems[];
-extern MenuItem xdata AboutThisDeviceMenuItems[];
-extern MenuItem xdata AboutOLED_UIMenuItems[];
 extern MenuItem xdata MoreMenuItems[];
 extern MenuPage xdata MainMenuPage;
 extern MenuPage xdata SettingsMenuPage;
-extern MenuPage xdata AboutThisDeviceMenuPage;
-extern MenuPage xdata AboutOLED_UIMenuPage;
 extern MenuPage xdata MoreMenuPage;
 extern MenuItem xdata TimeSetMenuItems[];
 extern MenuPage xdata TimeSetMenuPage;
@@ -351,10 +343,6 @@ extern MenuPage xdata CountdownMenuPage;
 /* Small float helpers (avoid 64-bit FP lib calls on C251) */
 float OLEDUI_AbsF(float v);
 int16_t OLEDUI_CeilF(float v);
-
-/* Frame rate */
-void GetFPS(void);
-void OLED_UI_ShowFPS(void);
 
 /* Drawing helpers */
 OLED_Font GetOLED_Font(OLED_Font fontsize, unsigned char style);
@@ -401,7 +389,7 @@ void SetTargetScrollBarHeight(void);
 void SetTargetProbWidth(void);
 
 /* Render */
-void DrawLinePermix(MenuPage *page, MenuID i, OLED_Point *CursorPoint, OLED_Font ChineseFont, OLED_Font ASCIIFont);
+void DrawLinePermix(MenuPage *page, MenuID i, OLED_Point *CursorPoint, OLED_Font ASCIIFont);
 void PrintMenuElements(void);
 
 /* Input */

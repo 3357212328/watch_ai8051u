@@ -14,8 +14,6 @@
  * MenuItem: text, callback, submenu, radio, icon, _LineSlip.
  */
 
-float edata testfloatnum = 0.5f;
-long edata testintnum = 1;
 #define SPEED 10
 
 /* Brightness adjust window, binds the live brightness value */
@@ -32,70 +30,6 @@ MenuWindow xdata SetBrightnessWindow = {
 void BrightnessWindow(void)
 {
     OLED_UI_CreateWindow(&SetBrightnessWindow);
-}
-
-/* Plain window without text or data */
-MenuWindow xdata NullWindow = {
-    80, 28, 4.0f, WINDOW_ROUNDRECTANGLE,
-    (char code *)0, 0, 0, 0,
-    (float edata *)0, (int8_t edata *)0, (int16_t edata *)0, (int32_t edata *)0, (long edata *)0,
-    0.0f, 0.0f, 0.0f, 0, 0, 0, 0.0f
-};
-
-/*
- * @brief Pop up the empty window demo.
- */
-void EmptyWindow(void)
-{
-    OLED_UI_CreateWindow(&NullWindow);
-}
-
-/* Text only window */
-MenuWindow xdata TextWindow = {
-    75, 18, 4.0f, WINDOW_ROUNDRECTANGLE,
-    (char code *)"Hello text", OLED_UI_FONT_12, 8, 2,
-    (float edata *)0, (int8_t edata *)0, (int16_t edata *)0, (int32_t edata *)0, (long edata *)0,
-    0.0f, 0.0f, 0.0f, 0, 0, 0, 0.0f
-};
-
-/*
- * @brief Pop up the text window demo.
- */
-void ShowTextWindow(void)
-{
-    OLED_UI_CreateWindow(&TextWindow);
-}
-
-/* Float live data window */
-MenuWindow xdata FloatDataWindow = {
-    80, 28, 4.0f, WINDOW_ROUNDRECTANGLE,
-    (char code *)"Float Demo", OLED_UI_FONT_12, 4, 3,
-    &testfloatnum, (int8_t edata *)0, (int16_t edata *)0, (int32_t edata *)0, (long edata *)0,
-    0.1f, -100.0f, 100.0f, 3, 4, 8, 0.0f
-};
-
-/*
- * @brief Pop up the float data window demo.
- */
-void ShowFloatDataWindow(void)
-{
-    OLED_UI_CreateWindow(&FloatDataWindow);
-}
-
-/* Integer live data window */
-MenuWindow xdata IntDataWindow = {
-    80, 28, 4.0f, WINDOW_ROUNDRECTANGLE,
-    (char code *)"Int Demo", OLED_UI_FONT_12, 4, 3,
-    (float edata *)0, (int8_t edata *)0, (int16_t edata *)0, &testintnum, (long edata *)0,
-    1.0f, -100.0f, 100.0f, 3, 4, 8, 0.0f
-};
-
-/*
- * @brief Pop up the integer data window demo.
- */
-void ShowIntDataWindow(void)
-{
-    OLED_UI_CreateWindow(&IntDataWindow);
 }
 
 /* Time Set edit windows, bind the staging values in watch_face.c.
@@ -332,38 +266,6 @@ void SettingAuxFunc(void)
     OLED_ShowImageArea(OLEDUI_CeilF(WelcomeTextMove.CurrentPoint.X), OLEDUI_CeilF(WelcomeTextMove.CurrentPoint.Y), 16, 64, 0, 0, 128, 128, OLED_UI_LOGOGithub);
 }
 
-/* Device page side picture */
-void AboutThisDeviceAuxFunc(void)
-{
-    LogoMove.TargetPoint.X = 0.0f;
-    LogoMove.TargetPoint.Y = -80.0f;
-    ChangePoint(&LogoMove);
-    OLED_ShowImageArea(OLEDUI_CeilF(LogoMove.CurrentPoint.X), OLEDUI_CeilF(LogoMove.CurrentPoint.Y), 32, 64, 0, 0, 128, 128, OLED_UI_SettingsLogo);
-    if (OLEDUI_AbsF(OLED_UI_PageStartPoint.CurrentPoint.X - OLED_UI_PageStartPoint.TargetPoint.X) < 4.0f)
-    {
-        LogoTextMove.TargetPoint.X = 102.0f;
-        LogoTextMove.TargetPoint.Y = 0.0f;
-    }
-    ChangePoint(&LogoTextMove);
-    OLED_ShowImageArea(OLEDUI_CeilF(LogoTextMove.CurrentPoint.X), OLEDUI_CeilF(LogoTextMove.CurrentPoint.Y), 26, 64, 0, 0, 128, 128, OLED_UI_LOGOTEXT64);
-}
-
-/* About page side picture */
-void AboutOLED_UIAuxFunc(void)
-{
-    LogoMove.TargetPoint.X = 0.0f;
-    LogoMove.TargetPoint.Y = -80.0f;
-    ChangePoint(&LogoMove);
-    OLED_ShowImageArea(OLEDUI_CeilF(LogoMove.CurrentPoint.X), OLEDUI_CeilF(LogoMove.CurrentPoint.Y), 32, 64, 0, 0, 128, 128, OLED_UI_SettingsLogo);
-    if (OLEDUI_AbsF(OLED_UI_PageStartPoint.CurrentPoint.X - OLED_UI_PageStartPoint.TargetPoint.X) < 4.0f)
-    {
-        WelcomeTextMove.TargetPoint.X = 110.0f;
-        WelcomeTextMove.TargetPoint.Y = 0.0f;
-    }
-    ChangePoint(&WelcomeTextMove);
-    OLED_ShowImageArea(OLEDUI_CeilF(WelcomeTextMove.CurrentPoint.X), OLEDUI_CeilF(WelcomeTextMove.CurrentPoint.Y), 16, 64, 0, 0, 128, 128, OLED_UI_LOGOGithub);
-}
-
 /* Main page: park all logos off screen */
 void MainAuxFunc(void)
 {
@@ -401,33 +303,7 @@ MenuItem xdata MainMenuItems[] = {
 MenuItem xdata SettingsMenuItems[] = {
     {(char code *)"Brightness", BrightnessWindow, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
     {(char code *)"Dark Mode", NULL, NULL, &ColorMode, (const uint8_t code *)0, 0.0f},
-    {(char code *)"Show FPS", NULL, NULL, &OLED_UI_ShowFpsFlag, (const uint8_t code *)0, 0.0f},
-    {(char code *)"About Device", NULL, &AboutThisDeviceMenuPage, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
-    {(char code *)"About OLED UI", NULL, &AboutOLED_UIMenuPage, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
     {(char code *)"Time Set", NULL, &TimeSetMenuPage, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
-    {(char code *)"Thanks for watching!", NULL, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
-    {(char code *)"[Back]", OLED_UI_Back, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
-    {(char code *)0, NULL, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f}
-};
-
-MenuItem xdata AboutThisDeviceMenuItems[] = {
-    {(char code *)"-[MCU:]", NULL, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
-    {(char code *)" AI8051U", NULL, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
-    {(char code *)" 8051 C251 Core", NULL, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
-    {(char code *)" MDU+TFPU Inside", NULL, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
-    {(char code *)"-[Screen:]", NULL, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
-    {(char code *)" SSD1306 128x64 OLED", NULL, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
-    {(char code *)"-[Link:]", NULL, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
-    {(char code *)" I2C OLED", NULL, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
-    {(char code *)"[Back]", OLED_UI_Back, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
-    {(char code *)0, NULL, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f}
-};
-
-MenuItem xdata AboutOLED_UIMenuItems[] = {
-    {(char code *)"-[Author:]", NULL, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
-    {(char code *)" bdth-7777777", NULL, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
-    {(char code *)"-[Address:]", NULL, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
-    {(char code *)" github.com/bdth-7777777/OLED_UI", NULL, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
     {(char code *)"[Back]", OLED_UI_Back, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
     {(char code *)0, NULL, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f}
 };
@@ -461,22 +337,6 @@ MenuPage xdata SettingsMenuPage = {
     MENU_TYPE_LIST, SPEED, REVERSE_ROUNDRECTANGLE, UNLINEAR, OLED_UI_FONT_12,
     &MainMenuPage, SettingsMenuItems, 4, SettingAuxFunc,
     {32.0f, 0.0f, 95.0f, 64.0f}, 0, 1, 4, 2,
-    0, 0, 0, 0,
-    0, 0, {0.0f, 0.0f}, 0
-};
-
-MenuPage xdata AboutThisDeviceMenuPage = {
-    MENU_TYPE_LIST, SPEED, REVERSE_BLOCK, UNLINEAR, OLED_UI_FONT_12,
-    &SettingsMenuPage, AboutThisDeviceMenuItems, 4, AboutThisDeviceAuxFunc,
-    {0.0f, 0.0f, 100.0f, 64.0f}, 0, 0, 4, 2,
-    0, 0, 0, 0,
-    0, 0, {0.0f, 0.0f}, 0
-};
-
-MenuPage xdata AboutOLED_UIMenuPage = {
-    MENU_TYPE_LIST, SPEED, REVERSE_BLOCK, UNLINEAR, OLED_UI_FONT_12,
-    &SettingsMenuPage, AboutOLED_UIMenuItems, 4, AboutOLED_UIAuxFunc,
-    {0.0f, 0.0f, 105.0f, 64.0f}, 0, 0, 4, 2,
     0, 0, 0, 0,
     0, 0, {0.0f, 0.0f}, 0
 };

@@ -293,7 +293,7 @@ WATCH_TRIM_SPD = 误差秒数 × 86400 ÷ 运行秒数
 
 例：跑了 6 小时慢了 90 秒 → `90 × 86400 ÷ 21600 = 360`，填 `-360`。该值要求绝对值 ≥ 2。
 
-为什么是编译期常量而不是菜单项：早期版本 code+const 占满 64 KB（余 < 400 B），没有 EEPROM 扇区可放参数；2026-11 精简后固件约 55.6 KB（余 ~9.9 KB），已能划出 1~2 KB EEPROM，但校准值仍保留为编译期宏：本板 RTC 无后备电池，开机时间每次归零，漂移只能在连续运行中实测标定，填宏比在菜单里存一个数更直接。RC 漂移随温度变化，一个固定值只能补偿平均值，不能做到完全准确。
+为什么是编译期常量而不是菜单项：早期版本 code+const 占满 64 KB（余 < 400 B），没有 EEPROM 扇区可放参数；2026-11 精简后固件约 53.1 KB（余 ~12.4 KB），已能划出 1~2 KB EEPROM，但校准值仍保留为编译期宏：本板 RTC 无后备电池，开机时间每次归零，漂移只能在连续运行中实测标定，填宏比在菜单里存一个数更直接。RC 漂移随温度变化，一个固定值只能补偿平均值，不能做到完全准确。
 
 另外 `WATCH_USE_X32K`（默认 0）保留给将来焊了 32.768 kHz 晶振的板子：置 1 后上电最多等约 1 秒等起振，成功后精度到 ppm 级（每天 < 1 秒），起振失败自动回退 IRC32K。
 
@@ -304,7 +304,7 @@ WATCH_TRIM_SPD = 误差秒数 × 86400 ÷ 运行秒数
 | 位置 | 按键 | 动作 |
 |------|------|------|
 | 表盘 | 任意按键**释放** / 编码器转动 / USB 虚拟键 | 进入主菜单（开机默认停在表盘，不会自动进菜单） |
-| 主菜单 | Enter 释放 | 确认选中 tile（Calendar/Up Timer/Dino/Plane 直开应用；Alarm/Count Down/Settings 为子页）；9 个 tile 单行横条滚动，选中项恒居中，底部 14 px 滑块**就是选中光标**（按 `_ActiveMenuID` 在 9 格轨道上移动）；退出应用回到主菜单时停在刚才的 tile，不会跳回第一格；More 现只保留 Stopwatch（2026-11 为省 flash 删除了字体/长列表/窗口等框架 demo） |
+| 主菜单 | Enter 释放 | 确认选中 tile（Calendar/Up Timer/Dino/Plane 直开应用；Alarm/Count Down/Settings 为子页）；9 个 tile 单行横条滚动，选中项恒居中，底部 14 px 滑块**就是选中光标**（按 `_ActiveMenuID` 在 9 格轨道上移动）；退出应用回到主菜单时停在刚才的 tile，不会跳回第一格；More 现只保留 Stopwatch，Settings 只保留 Brightness / Dark Mode / Time Set / Back（2026-11 为省 flash 删除了字体/长列表/窗口/About 等框架 demo 与 FPS 叠加） |
 | 菜单内 | Back 释放 | 返回上级；顶层菜单 Back 返回表盘 |
 | 菜单内 | 30 秒无操作 | 自动回表盘 |
 | Time Set | Enter 打开编辑窗，Up/Down 调值 | 六窗口 Hour/Minute/Second/Year/Month/Day（窗口内钳位）；**打开某窗口时该字段先同步为当前 RTC 值**，Save Time 只回写"打开过窗口"的字段（其余从 RTC 现读，不再把开机快照倒灌），并以闰月天数二次钳位，弹 "Time saved!" |
@@ -337,7 +337,7 @@ USB 虚拟按键：串口控制台发送 `e`（确认）、`b`（返回）、`w`
 - C89（Keil C251），所有菜单数据为定位初始化器，`MenuWindow`/`MenuPage`/`MenuItem` 字段顺序详见 `oled_ui_menudata.c` 头部注释。
 - `edata` 仅保留速度敏感变量（ISR 上下文的 `WatchTickFire`、框架类型钉死的 `Watch_Stage*` 六个暂存 int16），其余状态量在 `xdata`（超时溢出策略：优先迁 xdata）。
 - 框架契约：`OLED_UI_MainLoop()` 每帧（菜单模式由 `Watch_Render` 菜单分支驱动）、`OLED_UI_InterruptHandler()` 每 20ms tick（`Watch_Tick` 驱动）；表盘/秒表模式自行消耗全部 `USBCtrl_Take*`/`Encoder_Get`，防止虚拟脉冲泄漏进菜单。
-- 构建：`build.bat` 或 `UV4.exe -r ai8051u_templete.uvproj -j0 -o build.log`；当前 0 Error/0 Warning，code 50,854 + const 4,737 = **55,591 B / 64 KB**（余约 9.9K 字节），data 8.4，edata+hdata 1974/2048，xdata 5148/32768。烧录前请确认 STC-ISP 的「EEPROM 大小设置」为 0K（或 ≤8K）；程序区 64 KB 时固件只占 55.6 KB，即使划 8 KB EEPROM 也能装下。
+- 构建：`build.bat` 或 `UV4.exe -r ai8051u_templete.uvproj -j0 -o build.log`；当前 0 Error/0 Warning，code 49,295 + const 3,769 = **53,065 B / 64 KB**（余约 12.4K 字节），data 8.4，edata+hdata 1937/2048，xdata 4510/32768。烧录前请确认 STC-ISP 的「EEPROM 大小设置」为 0K（或 ≤8K）；程序区 64 KB 时固件只占 53.1 KB，即使划 8 KB EEPROM 也能装下。
 - 刷新策略：`OLED_Update()` 逐页比对显存镜像，只推送内容变化的页（颜色模式真变化时强制整屏推送，保证反色闪屏不丢）；编码器在 I2C 忙等中采样，快速旋转不丢步。
 
 ## 许可证
