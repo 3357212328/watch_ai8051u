@@ -136,10 +136,6 @@ OLED_Font GetOLED_Font(OLED_Font fontsize, unsigned char style)
             ChineseFont = OLED_16X16_FULL;
             ASCIIFont = OLED_8X16_HALF;
             break;
-        case OLED_UI_FONT_20:
-            ChineseFont = OLED_20X20_FULL;
-            ASCIIFont = OLED_10X20_HALF;
-            break;
         default:
             ChineseFont = OLED_12X12_FULL;
             ASCIIFont = OLED_7X12_HALF;

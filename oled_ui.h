@@ -96,7 +96,6 @@ extern uint8_t edata OLED_DisplayBuf[OLED_HEIGHT / 8][OLED_WIDTH];
 #define OLED_UI_FONT_8              (8)
 #define OLED_UI_FONT_12             (12)
 #define OLED_UI_FONT_16             (16)
-#define OLED_UI_FONT_20             (20)
 
 #define CHINESE                     (0)
 #define ASCII                       (1)
@@ -336,27 +335,11 @@ extern MenuItem xdata SettingsMenuItems[];
 extern MenuItem xdata AboutThisDeviceMenuItems[];
 extern MenuItem xdata AboutOLED_UIMenuItems[];
 extern MenuItem xdata MoreMenuItems[];
-extern MenuItem xdata Font8MenuItems[];
-extern MenuItem xdata Font12MenuItems[];
-extern MenuItem xdata Font16MenuItems[];
-extern MenuItem xdata Font20MenuItems[];
-extern MenuItem xdata LongMenuItems[];
-extern MenuItem xdata SpringMenuItems[];
-extern MenuItem xdata LongListMenuItems[];
-extern MenuItem xdata SmallAreaMenuItems[];
 extern MenuPage xdata MainMenuPage;
 extern MenuPage xdata SettingsMenuPage;
 extern MenuPage xdata AboutThisDeviceMenuPage;
 extern MenuPage xdata AboutOLED_UIMenuPage;
 extern MenuPage xdata MoreMenuPage;
-extern MenuPage xdata Font8MenuPage;
-extern MenuPage xdata Font12MenuPage;
-extern MenuPage xdata Font16MenuPage;
-extern MenuPage xdata Font20MenuPage;
-extern MenuPage xdata LongMenuPage;
-extern MenuPage xdata SpringMenuPage;
-extern MenuPage xdata LongListMenuPage;
-extern MenuPage xdata SmallAreaMenuPage;
 extern MenuItem xdata TimeSetMenuItems[];
 extern MenuPage xdata TimeSetMenuPage;
 extern MenuItem xdata AlarmMenuItems[];

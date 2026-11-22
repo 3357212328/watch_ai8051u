@@ -154,13 +154,54 @@ void timer_setting(timer_num num, int outclk, int int_en)
 // set_timer_mode(Timer0, "1000hz", Timer_End);
 // 下面这个例子的功能是设置Timer0为10ms的定时器。
 // set_timer_mode(Timer0, "10ms", Timer_End);
+/* Parse "<digits>[.<digits>]<unit>" without sscanf(): this keeps the float
+   scanf library (about 2.5 KB of flash) out of the image.  Units: u = us,
+   m = ms, s = s, h = Hz (frequency, converted to the matching period). */
+static int timer_opt_num(char *s)
+{
+    int n = 0;
+    while (*s >= '0' && *s <= '9')
+    {
+        n = n * 10 + (*s - '0');
+        s++;
+    }
+    return n;
+}
+
+static void timer_parse_period(char *s, float *value)
+{
+    unsigned long ip = 0, fp = 0, scale = 1;
+    float v;
+    char unit = 0;
+    if ((*s < '0' || *s > '9') && *s != '.') return;
+    while (*s >= '0' && *s <= '9')
+    {
+        ip = ip * 10 + (unsigned long)(*s - '0');
+        s++;
+    }
+    if (*s == '.')
+    {
+        s++;
+        while (*s >= '0' && *s <= '9' && scale < 1000UL)
+        {
+            fp = fp * 10 + (unsigned long)(*s - '0');
+            scale *= 10;
+            s++;
+        }
+    }
+    if (*s == 'u' || *s == 'm' || *s == 's' || *s == 'h') unit = *s;
+    v = (float)ip + (float)fp / (float)scale;
+    if (unit == 'u') *value = v * 1e-6f;
+    else if (unit == 'm') *value = v * 1e-3f;
+    else if (unit == 's') *value = v;
+    else if (unit == 'h') { if (v > 0.0f) *value = 1.0f / v; }
+}
 void set_timer_mode(timer_num num, ...)
 {
     char *arg;
-    char enable_interrupt = 0, enable_outclk = 0, _char = 0; // 中断使能和输出时钟使能
+    char enable_interrupt = 0, enable_outclk = 0; // 中断使能和输出时钟使能
 		int ct_mode = 0;              							             // 定时器/计数器模式切换
-    int _sw_dat = 0;                                         // 设置值缓存
-    float _set_timer_value = 0, set_timer_value = 0;         // 缓存和定时器设置值
+    float set_timer_value = 0;         // 缓存和定时器设置值
     va_list args;            // 可变参数列表
     va_start(args, num);     // 初始化可变参数列表
     get_main_fosc();         // 获取当前时钟主频
@@ -168,15 +209,11 @@ void set_timer_mode(timer_num num, ...)
     while (1)
     {
         arg = va_arg(args, char *);
-        if (sscanf(arg, "en%c", &_char) == 1)break;//遇到哨兵值，结束
-        enable_interrupt = sscanf(arg, "\x01int%d", &_sw_dat) == 1 ? _sw_dat : enable_interrupt;//设置是否中断使能
-        enable_outclk = sscanf(arg, "\x01outclk%d", &_sw_dat) == 1 ? _sw_dat : enable_outclk;//设置是否时钟输出使能
-				ct_mode = sscanf(arg, "ct%d", &_sw_dat) == 1 ? _sw_dat : ct_mode;//设置是定时还是计数模式
-        if(sscanf(arg, "%f%c", &_set_timer_value, &_char) == 2){// 单位处理
-						if(_char == 'u')set_timer_value = _set_timer_value * 1e-6f;// 微秒
-            if(_char == 'm')set_timer_value = _set_timer_value * 1e-3f;// 毫秒
-            if(_char == 's')set_timer_value = _set_timer_value;// 秒
-            if(_char == 'h')set_timer_value = 1.0f/_set_timer_value;}// 赫兹转换时间单位
+        if (arg[0] == 'e' && arg[1] == 'n' && arg[2] == 'd' && arg[3] == 0)break;//遇到哨兵值，结束
+        if (arg[0] == '\x01' && arg[1] == 'i' && arg[2] == 'n' && arg[3] == 't')enable_interrupt = (char)timer_opt_num(arg + 4);//设置是否中断使能
+        if (arg[0] == '\x01' && arg[1] == 'o')enable_outclk = (char)timer_opt_num(arg + 7);//设置是否时钟输出使能
+				if (arg[0] == 'c' && arg[1] == 't')ct_mode = timer_opt_num(arg + 2);//设置是定时还是计数模式
+        timer_parse_period(arg, &set_timer_value);
     }
     timer_setting(num, enable_outclk, enable_interrupt);// 设置定时器模式
     timer_value_setting(num, set_timer_value, ct_mode); // 设置定时器值

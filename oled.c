@@ -328,10 +328,6 @@ void OLED_ShowChar(int16_t X, int16_t Y, char Char, uint8_t FontSize)
     {
         OLED_ShowImage(X, Y, 7, 12, OLED_F7x12[Char - ' ']);
     }
-    else if (FontSize == OLED_10X20_HALF)
-    {
-        OLED_ShowImage(X, Y, 10, 20, OLED_F10x20[Char - ' ']);
-    }
 }
 
 /* Show an unsigned decimal number, padded with leading zeros to Length. */
@@ -645,10 +641,6 @@ void OLED_ShowCharArea(int16_t RangeX, int16_t RangeY, int16_t RangeWidth, int16
     else if (FontSize == OLED_7X12_HALF)
     {
         OLED_ShowImageArea(X, Y, 7, 12, RangeX, RangeY, RangeWidth, RangeHeight, OLED_F7x12[Char - ' ']);
-    }
-    else if (FontSize == OLED_10X20_HALF)
-    {
-        OLED_ShowImageArea(X, Y, 10, 20, RangeX, RangeY, RangeWidth, RangeHeight, OLED_F10x20[Char - ' ']);
     }
 }
 

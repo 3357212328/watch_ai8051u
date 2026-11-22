@@ -34,7 +34,6 @@ typedef struct
 } ChineseCell8x8_t;
 
 /* ASCII fonts, stored in flash (code memory) */
-extern const unsigned char code OLED_F10x20[][30];
 extern const unsigned char code OLED_F8x16[][16];
 extern const unsigned char code OLED_F7x12[][14];
 extern const unsigned char code OLED_F6x8[][6];

@@ -66,6 +66,38 @@ static void get_main_fosc(void) // 查询一次当前的时钟频率，只能查
     _set_i2c_fosc = 1;//获取一次后不再重复获取
 }
 
+/* Lightweight option parsing for set_i2c_mode(): replaces sscanf() so the
+   float scanf/printf library (about 2.5 KB of flash) is not linked in.
+   Supported forms are the ones in set_i2c.h: "end", "\x01enable",
+   "\x01disable", "i2c0".."i2c3", "<digits>khz", "<digits>mhz". */
+static int i2c_opt_num(char *s)
+{
+    int n = 0;
+    while (*s >= '0' && *s <= '9')
+    {
+        n = n * 10 + (*s - '0');
+        s++;
+    }
+    return n;
+}
+
+static float i2c_opt_speed(char *s, unsigned char unit)
+{
+    unsigned long n = 0;
+    while (*s >= '0' && *s <= '9')
+    {
+        n = n * 10 + (unsigned long)(*s - '0');
+        s++;
+    }
+    if (n == 0) return i2c_speed;
+    if (unit == 'k')
+    {
+        if (*s != 'k') return i2c_speed;
+        return (float)(n * 1000UL);
+    }
+    if (*s != 'm') return i2c_speed;
+    return (float)(n * 1000000UL);
+}
 void set_i2c_mode(i2c_name i2c, ...)
 {
     char *arg;
@@ -76,12 +108,12 @@ void set_i2c_mode(i2c_name i2c, ...)
     while (1)
     {
         arg = va_arg(args, char *);
-        if (sscanf(arg, "en%c", &_char) == 1)break;        // 遇到哨兵，结束
-        i2c_enable = sscanf(arg, "\x01enabl%c", &_char) == 1 ? 1 : i2c_enable;//使能i2c功能
-        i2c_enable = sscanf(arg, "\x01disabl%c", &_char) == 1 ? 0 : i2c_enable;//关闭i2c功能
-        i2c_sw = sscanf(arg, "i2c%d", &_i2c_sw) == 1 ? _i2c_sw : i2c_sw;//获取i2c引脚切换方式
-        i2c_speed = sscanf(arg, "%fkh%c", &_i2c_speed, &_char) == 2 ? (_i2c_speed*1e3) : i2c_speed;//获取i2c通讯速率
-        i2c_speed = sscanf(arg, "%fmh%c", &_i2c_speed, &_char) == 2 ? (_i2c_speed*1e6) : i2c_speed;//获取i2c通讯速率
+        if (arg[0] == 'e' && arg[1] == 'n' && arg[2] == 'd' && arg[3] == 0)break;        // 遇到哨兵，结束
+        if (arg[0] == '\x01' && arg[1] == 'e')i2c_enable = 1;//使能i2c功能
+        if (arg[0] == '\x01' && arg[1] == 'd')i2c_enable = 0;//关闭i2c功能
+        if (arg[0] == 'i' && arg[1] == '2' && arg[2] == 'c')i2c_sw = i2c_opt_num(arg + 3);//获取i2c引脚切换方式
+        i2c_speed = i2c_opt_speed(arg, 'k');//获取i2c通讯速率
+        i2c_speed = i2c_opt_speed(arg, 'm');//获取i2c通讯速率
     }
     get_main_fosc();
 		MSSPEED = (_main_fosc - 8 * i2c_speed) / (4 * i2c_speed);
