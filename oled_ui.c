@@ -892,11 +892,7 @@ void SetLineSplitZero(void)
  */
 void SetTargetScrollBarHeight(void)
 {
-    if (CurrentMenuPage->General_MenuType == MENU_TYPE_LIST)
-    {
-        OLED_UI_ScrollBarHeight.TargetDistance = (float)CurrentMenuPage->List_MenuArea.Height * (CurrentMenuPage->_ActiveMenuID + 1) / GetMenuItemNum(CurrentMenuPage->General_MenuItems);
-    }
-    else if (CurrentMenuPage->General_MenuType == MENU_TYPE_TILES)
+    if (CurrentMenuPage->General_MenuType == MENU_TYPE_TILES)
     {
         OLED_UI_ScrollBarHeight.TargetDistance = (float)(CurrentMenuPage->Tiles_ScreenWidth * (CurrentMenuPage->_ActiveMenuID + 1) / GetMenuItemNum(CurrentMenuPage->General_MenuItems));
     }
@@ -1102,10 +1098,6 @@ void PrintMenuElements(void)
 
             CursorPoint.Y += (page->General_FontSize + OLED_UI_LineStep.CurrentDistance);
         }
-
-        /* Scrollbar: filled block plus center line */
-        OLED_DrawRectangle(OLEDUI_CeilF(TempTargetArea.CurrentArea.X) + OLEDUI_CeilF(TempTargetArea.CurrentArea.Width) - 5, OLEDUI_CeilF(TempTargetArea.CurrentArea.Y), 5, (OLED_UI_ScrollBarHeight.CurrentDistance > page->List_MenuArea.Height) ? OLEDUI_CeilF(page->List_MenuArea.Height) : OLEDUI_CeilF(OLED_UI_ScrollBarHeight.CurrentDistance), OLED_FILLED);
-        OLED_DrawLine(OLEDUI_CeilF(TempTargetArea.CurrentArea.X) + OLEDUI_CeilF(TempTargetArea.CurrentArea.Width) - 3, OLEDUI_CeilF(TempTargetArea.CurrentArea.Y), OLEDUI_CeilF(TempTargetArea.CurrentArea.X) + OLEDUI_CeilF(TempTargetArea.CurrentArea.Width) - 3, OLEDUI_CeilF(TempTargetArea.CurrentArea.Height) + OLEDUI_CeilF(TempTargetArea.CurrentArea.Y) - 1);
     }
     if (page->General_MenuType == MENU_TYPE_TILES)
     {

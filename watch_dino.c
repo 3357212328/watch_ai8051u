@@ -440,7 +440,7 @@ void Watch_Dino_Render(void)
     if (DinoState != DINO_STATE_RUN)
     {
         /* Game over: big card, final score, restart/exit hints */
-        OLED_ShowString(19, 20, (char code *)"GAME OVER", OLED_10X20_HALF);
+        OLED_ShowString(28, 18, (char code *)"GAME OVER", OLED_8X16_HALF);
         OLED_ShowString(37, 44, (char code *)"SCORE", OLED_6X8_HALF);
         OLED_ShowNum(70, 44, DinoScore, 4, OLED_6X8_HALF);
         OLED_ShowString(19, 56, (char code *)"E:AGAIN  B:EXIT", OLED_6X8_HALF);

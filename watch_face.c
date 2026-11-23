@@ -662,14 +662,100 @@ void Watch_Render(void)
     }
 }
 
+/* --------------------------------------------------------------------
+ * Big 7-segment time
+ * Drawn from filled rectangles instead of a bitmap font. One cell is
+ * 20 x 32 px with 3 px strokes and 1 px gaps between the segments, so
+ * four digits plus a colon fit in 100 px without touching flash.
+ * Cell layout: top bar rows 0..2, upper stems 4..12, middle bar
+ * 14..16, lower stems 18..27, bottom bar 29..31. The stems sit on the
+ * 3 px side columns, the bars start at x + 4: that leaves a 1 px
+ * corner gap, which reads as a real segmented display.
+ * ------------------------------------------------------------------ */
+static unsigned char code WatchSegCode[10] = {
+    /* bit0 a top, bit1 b upper right, bit2 c lower right, bit3 d
+     * bottom, bit4 e lower left, bit5 f upper left, bit6 g middle */
+    0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F
+};
+
 /*
- * @brief Watch face: weekday+date, big time with blinking colon,
- *        second progress bar, weekday. Uses RTCSSEC (1/128 s) so the
- *        colon and the bar move sub-second smooth without any ISR.
+ * @brief One big digit with its top-left corner at (x, y).
+ */
+static void Watch_DrawBigDigit(int16_t x, int16_t y, unsigned char digit)
+{
+    unsigned char seg;
+
+    if (digit > 9U)
+    {
+        digit = 0U;              /* never index outside the table */
+    }
+    seg = WatchSegCode[digit];
+
+    if ((seg & 0x01U) != 0)      /* a: top */
+    {
+        OLED_DrawRectangle((int16_t)(x + 4), y, 12, 3, OLED_FILLED);
+    }
+    if ((seg & 0x40U) != 0)      /* g: middle */
+    {
+        OLED_DrawRectangle((int16_t)(x + 4), (int16_t)(y + 14), 12, 3, OLED_FILLED);
+    }
+    if ((seg & 0x08U) != 0)      /* d: bottom */
+    {
+        OLED_DrawRectangle((int16_t)(x + 4), (int16_t)(y + 29), 12, 3, OLED_FILLED);
+    }
+    if ((seg & 0x02U) != 0)      /* b: upper right */
+    {
+        OLED_DrawRectangle((int16_t)(x + 17), (int16_t)(y + 4), 3, 9, OLED_FILLED);
+    }
+    if ((seg & 0x04U) != 0)      /* c: lower right */
+    {
+        OLED_DrawRectangle((int16_t)(x + 17), (int16_t)(y + 18), 3, 10, OLED_FILLED);
+    }
+    if ((seg & 0x20U) != 0)      /* f: upper left */
+    {
+        OLED_DrawRectangle(x, (int16_t)(y + 4), 3, 9, OLED_FILLED);
+    }
+    if ((seg & 0x10U) != 0)      /* e: lower left */
+    {
+        OLED_DrawRectangle(x, (int16_t)(y + 18), 3, 10, OLED_FILLED);
+    }
+}
+
+/*
+ * @brief A 100 x 32 px "AA:BB" group at (x, y). Digits inside a pair
+ *        sit 24 px apart (20 + 4 gap), the colon gets an 8 px slot
+ *        centred on the cell height. colonOn = 0 blanks the two 4 x 4
+ *        dots for the half-second blink.
+ *        Span = x .. x + 99, so x = 14 gives 14 px of margin a side.
+ */
+static void Watch_DrawBigPair(int16_t x, int16_t y, unsigned char a,
+                              unsigned char b, unsigned char colonOn)
+{
+    Watch_DrawBigDigit(x, y, (unsigned char)(a / 10U));
+    Watch_DrawBigDigit((int16_t)(x + 24), y, (unsigned char)(a % 10U));
+
+    if (colonOn != 0)
+    {
+        OLED_DrawRectangle((int16_t)(x + 48), (int16_t)(y + 8), 4, 4, OLED_FILLED);
+        OLED_DrawRectangle((int16_t)(x + 48), (int16_t)(y + 20), 4, 4, OLED_FILLED);
+    }
+
+    Watch_DrawBigDigit((int16_t)(x + 56), y, (unsigned char)(b / 10U));
+    Watch_DrawBigDigit((int16_t)(x + 80), y, (unsigned char)(b % 10U));
+}
+
+/*
+ * @brief Watch face. Four bands, everything centred on x = 64:
+ *          date            6x8    y  3..10   x 34..93
+ *          big HH:MM       7seg   y 13..44   x 14..113
+ *          MON | ss        6x8    y 50..57   x 44..83
+ *          second rail     2 px   y 60..61   x 14..113
+ *        The colon blinks on the half second and the rail grows by
+ *        sub-second, both driven by RTCSSEC, so neither needs an ISR.
  */
 static void Watch_RenderFace(void)
 {
-    uint16_t bar;
+    uint16_t rail;
     unsigned char w, i, showColon;
 
     OLED_SetColorMode(ColorMode);
@@ -677,7 +763,7 @@ static void Watch_RenderFace(void)
     OLED_Clear();
     WatchTime_Read(&WatchFaceTime);
 
-    /* Top row: 2026-10-21 (6x8), centered */
+    /* Band 1: 2026-10-21 (6x8), 60 px wide, centred at x = 34 */
     WatchFaceBuf[0] = '2';
     WatchFaceBuf[1] = '0';
     WatchFaceBuf[2] = (char)('0' + WatchFaceTime.Year / 10);
@@ -691,39 +777,35 @@ static void Watch_RenderFace(void)
     WatchFaceBuf[10] = '\0';
     OLED_ShowString(34, 3, WatchFaceBuf, OLED_6X8_HALF);
 
-    /* Big time HH:MM:SS (10x20), colon blinks each half second */
-    showColon = (WatchFaceTime.SubSec & 0x40) ? 1 : 0;
-    WatchFaceBuf[0] = (char)('0' + WatchFaceTime.Hour / 10);
-    WatchFaceBuf[1] = (char)('0' + WatchFaceTime.Hour % 10);
-    WatchFaceBuf[2] = (char)(showColon ? ':' : ' ');
-    WatchFaceBuf[3] = (char)('0' + WatchFaceTime.Minute / 10);
-    WatchFaceBuf[4] = (char)('0' + WatchFaceTime.Minute % 10);
-    WatchFaceBuf[5] = (char)(showColon ? ':' : ' ');
-    WatchFaceBuf[6] = (char)('0' + WatchFaceTime.Second / 10);
-    WatchFaceBuf[7] = (char)('0' + WatchFaceTime.Second % 10);
-    WatchFaceBuf[8] = '\0';
-    OLED_ShowString(24, 15, WatchFaceBuf, OLED_10X20_HALF);
+    /* Band 2: big HH:MM, colon blinks each half second */
+    showColon = (unsigned char)((WatchFaceTime.SubSec & 0x40U) ? 1 : 0);
+    Watch_DrawBigPair(14, 13, WatchFaceTime.Hour, WatchFaceTime.Minute, showColon);
 
-    /* Second progress bar, inner reaches 117 px at :59.984 and 0 at
-     * :00.000, no clamp or end snap needed (rounds to nearest px) */
-    bar = (uint16_t)(((unsigned long)(WatchFaceTime.Second * 128U + WatchFaceTime.SubSec) * 117UL + 3839UL) / 7679UL);
-    OLED_DrawRectangle(4, 42, 120, 8, 0);
-    if (bar != 0)
-    {
-        OLED_DrawRectangle(6, 43, (int16_t)bar, 6, 1);
-    }
-
-    /* Bottom row: weekday (6x8), centered */
+    /* Band 3: MON | 45, a 40 px group centred at x = 64
+     * (weekday 44..61, divider 66, seconds 72..83) */
     w = Watch_Weekday(WatchFaceTime.Year, WatchFaceTime.Month, WatchFaceTime.Day);
-    for (i = 0; i < 3; i++)
+    for (i = 0; i < 3U; i++)
     {
-        OLED_ShowChar(55 + i * 6, 53, WatchWeekNames[w][i], OLED_6X8_HALF);
+        OLED_ShowChar((int16_t)(44 + i * 6), 50, WatchWeekNames[w][i], OLED_6X8_HALF);
+    }
+    OLED_DrawRectangle(66, 51, 1, 6, OLED_FILLED);
+    OLED_ShowNum(72, 50, WatchFaceTime.Second, 2, OLED_6X8_HALF);
+
+    /* Band 4: second rail. 1 px track, 2 px fill that reaches the full
+     * 100 px at :59.984 and stays at 0 at :00.000 (rounds to nearest) */
+    OLED_DrawRectangle(14, 61, 100, 1, OLED_FILLED);
+    rail = (uint16_t)(((unsigned long)(WatchFaceTime.Second * 128U + WatchFaceTime.SubSec) * 100UL + 3839UL) / 7679UL);
+    if (rail != 0)
+    {
+        OLED_DrawRectangle(14, 60, (int16_t)rail, 2, OLED_FILLED);
     }
     OLED_Update();
 }
 
 /*
- * @brief Stopwatch screen: big centiseconds, state and key hints.
+ * @brief Stopwatch: same big digit block as the face, MM:SS with a
+ *        solid colon (the centiseconds below carry the motion).
+ *        State bottom left, running centiseconds bottom right.
  */
 static void Watch_RenderStopwatch(void)
 {
@@ -731,36 +813,27 @@ static void Watch_RenderStopwatch(void)
     unsigned int minutes;
     unsigned int seconds;
     unsigned int cents;
-    unsigned char i;
+    unsigned char i, n;
 
     OLED_SetColorMode(ColorMode);
     OLED_Brightness(OLED_UI_Brightness);
     OLED_Clear();
 
-    /* Title */
+    /* Title: 54 px wide, centred at x = 37 */
     WatchFaceBuf[0] = 'S'; WatchFaceBuf[1] = 'T'; WatchFaceBuf[2] = 'O';
     WatchFaceBuf[3] = 'P'; WatchFaceBuf[4] = 'W'; WatchFaceBuf[5] = 'A';
     WatchFaceBuf[6] = 'T'; WatchFaceBuf[7] = 'C'; WatchFaceBuf[8] = 'H';
     WatchFaceBuf[9] = '\0';
     OLED_ShowString(37, 2, WatchFaceBuf, OLED_6X8_HALF);
 
-    /* Big MM:SS.CC */
+    /* Big MM:SS (same 100 px block as the face, y 13..44) */
     cs = WatchStopwatchCS;
     minutes = (unsigned int)((cs / 6000UL) % 100UL);
     seconds = (unsigned int)((cs / 100UL) % 60UL);
     cents = (unsigned int)(cs % 100UL);
-    WatchFaceBuf[0] = (char)('0' + minutes / 10);
-    WatchFaceBuf[1] = (char)('0' + minutes % 10);
-    WatchFaceBuf[2] = ':';
-    WatchFaceBuf[3] = (char)('0' + seconds / 10);
-    WatchFaceBuf[4] = (char)('0' + seconds % 10);
-    WatchFaceBuf[5] = '.';
-    WatchFaceBuf[6] = (char)('0' + cents / 10);
-    WatchFaceBuf[7] = (char)('0' + cents % 10);
-    WatchFaceBuf[8] = '\0';
-    OLED_ShowString(24, 18, WatchFaceBuf, OLED_10X20_HALF);
+    Watch_DrawBigPair(14, 13, (unsigned char)minutes, (unsigned char)seconds, 1);
 
-    /* State row: static RUNNING / PAUSED status */
+    /* State row, bottom left (y 50..57) */
     i = 0;
     if (WatchStopwatchRunning)
     {
@@ -771,10 +844,6 @@ static void Watch_RenderStopwatch(void)
         WatchFaceBuf[i++] = 'I';
         WatchFaceBuf[i++] = 'N';
         WatchFaceBuf[i++] = 'G';
-        for (i = 0; i < 7; i++)
-        {
-            OLED_ShowChar(43 + i * 6, 42, WatchFaceBuf[i], OLED_6X8_HALF);
-        }
     }
     else
     {
@@ -784,33 +853,16 @@ static void Watch_RenderStopwatch(void)
         WatchFaceBuf[i++] = 'S';
         WatchFaceBuf[i++] = 'E';
         WatchFaceBuf[i++] = 'D';
-        for (i = 0; i < 6; i++)
-        {
-            OLED_ShowChar(46 + i * 6, 42, WatchFaceBuf[i], OLED_6X8_HALF);
-        }
+    }
+    n = i;
+    for (i = 0; i < n; i++)
+    {
+        OLED_ShowChar((int16_t)(8 + i * 6), 50, WatchFaceBuf[i], OLED_6X8_HALF);
     }
 
-    /* Key hints */
-    WatchFaceBuf[0] = 'E';
-    WatchFaceBuf[1] = 'N';
-    WatchFaceBuf[2] = 'T';
-    WatchFaceBuf[3] = ':';
-    WatchFaceBuf[4] = 'O';
-    WatchFaceBuf[5] = 'N';
-    WatchFaceBuf[6] = '/';
-    WatchFaceBuf[7] = 'O';
-    WatchFaceBuf[8] = 'F';
-    WatchFaceBuf[9] = 'F';
-    WatchFaceBuf[10] = ' ';
-    WatchFaceBuf[11] = 'E';
-    WatchFaceBuf[12] = 'N';
-    WatchFaceBuf[13] = 'C';
-    WatchFaceBuf[14] = ':';
-    WatchFaceBuf[15] = 'C';
-    WatchFaceBuf[16] = 'L';
-    WatchFaceBuf[17] = 'R';
-    WatchFaceBuf[18] = '\0';
-    OLED_ShowString(10, 55, WatchFaceBuf, OLED_6X8_HALF);
+    /* Centiseconds, bottom right: ".45" ends at x = 119 */
+    OLED_ShowChar(102, 50, '.', OLED_6X8_HALF);
+    OLED_ShowNum(108, 50, cents, 2, OLED_6X8_HALF);
 
     OLED_Update();
 }

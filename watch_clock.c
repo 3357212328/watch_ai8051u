@@ -177,7 +177,7 @@ static void Clk_PageMMSS(const char code *title, const char code *hint,
     OLED_Clear();
     Clk_DrawC(title, OLED_6X8_HALF, 2);
     Clk_FillMMSS(mm, ss);
-    OLED_ShowString(39, 16, ClkBuf, OLED_10X20_HALF);
+    OLED_ShowString(44, 16, ClkBuf, OLED_8X16_HALF);
     Clk_DrawC((running != 0) ? ClkRunTxt : ClkPauseTxt, OLED_6X8_HALF, 42);
     Clk_DrawC(hint, OLED_6X8_HALF, 55);
     OLED_Update();
@@ -380,7 +380,7 @@ void Watch_Ring_Render(void)
     OLED_Clear();
     if (len <= 6)
     {
-        Clk_DrawC(txt, OLED_10X20_HALF, 18);
+        Clk_DrawC(txt, OLED_8X16_HALF, 18);
         Clk_DrawC(ClkPressKey, OLED_6X8_HALF, 44);
     }
     else

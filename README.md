@@ -236,7 +236,7 @@ STC 官方为 AI8051U 实验箱提供的完整 32-bit 模式示例代码，覆�
 ├── io_int.c / .h               # IO 独立中断
 ├── oled.c / .h                 # SSD1306 OLED 底层驱动
 ├── oled_driver.c / .h          # OLED I2C 总线驱动
-├── oled_fonts.c / .h           # 字库与图形字体（F6x8 半宽、F10x20 等）
+├── oled_fonts.c / .h           # 字库与图形字体（F6x8 / F7x12 / F8x16 半宽、tile 图标）
 ├── oled_ui.c / .h              # OLED UI 菜单框架（含空闲/返回钩子扩展）
 ├── oled_ui_driver.c / .h       # UI 输入驱动（按键 + EC11 编码器 + 20ms tick）
 ├── oled_ui_menudata.c          # 菜单页面/窗口/条目数据
@@ -263,7 +263,7 @@ STC 官方为 AI8051U 实验箱提供的完整 32-bit 模式示例代码，覆�
 | 模块 | 说明 |
 |------|------|
 | [watch_time.c](watch_time.c) / [.h](watch_time.h) | 片上 RTC 驱动：XSFR `0x7EFE60+` 寄存器组，时钟源固定内部 IRC32K（`IRC32KCR=0x80` → `RTCCFG\|=0x02`，本板无 32.768K 晶振）；USB 主机在线时用 SIE 的 1ms SOF 帧计数做速率基准自动整秒纠偏（`WatchTime_Discipline`），离线时用 `WATCH_TRIM_SPD` 编译期常量补偿固定漂移（`WatchTime_TrimTick`），详见「时间精度」；`WATCH_USE_X32K=1` 可切外部晶振（需硬件）；INI 写默认值 2026-01-01 12:00 + `RTCCFG\|=0x01` 触发 + 轮询握手；全部 HEX 编码（非 BCD）；轮询模式无 RTC 中断（避开 0x123 向量陷阱）；`WatchTime_Set` 全字段钳位（闰年 2000–2099 用 `year%4`）并用有界等待防振荡器失效死循环 |
-| [watch_face.c](watch_face.c) / [.h](watch_face.h) | 应用状态机 `APP_WATCH_FACE / APP_MENU / APP_STOPWATCH`；表盘 = 日期（F6x8）+ 大字时间（F10x20，冒号由 RTC 亚秒寄存器 SSEC 位 0x40 每秒呼吸）+ 秒进度条（0→117 列映射 `sec*128+SubSec`）+ 星期（Zeller 公式软件算，不改 INIWEEK）；秒表 = 厘秒累计（Timer11 20ms 中断钩子 `set_timer_isr` 计数器驱动，不受阻塞式刷屏导致的 tick 折叠影响，走时精确） |
+| [watch_face.c](watch_face.c) / [.h](watch_face.h) | 应用状态机 `APP_WATCH_FACE / APP_MENU / APP_STOPWATCH`；表盘 = 日期（F6x8）+ 大字 HH:MM（程序化 7 段数码，20×32 px、3 px 笔画，不占字库 flash，冒号按 SSEC 位 0x40 半秒闪烁）+ 星期与秒（F6x8）+ 100 px 秒进度轨（`sec*128+SubSec` 映射）；秒表 = 同款 7 段 MM:SS + 右下厘秒（Timer11 20ms 中断钩子 `set_timer_isr` 计数器驱动，不受阻塞式刷屏导致的 tick 折叠影响，走时精确） |
 | [watch_icons.c](watch_icons.c) / [.h](watch_icons.h) | 32×32 时钟 tile 图标（SSD1306 列格式，主菜单第一格） |
 | [watch_clock.c](watch_clock.c) / [.h](watch_clock.h) | 闹钟 / 日历 / 正计时 / 倒计时 / 响铃页：闹钟每日 `HH:MM:00` 匹配（连续 2 个 20ms tick 防主态撕裂、非匹配分钟重武装修正每日漏响）；日历 2000–2099 Zeller 星期；正计时/倒计时暂停态可用编码器或 Up/Down 键清零/重载；倒计时计满与闹钟共用响铃页（全屏 1Hz 反色 + P5.0 蜂鸣 2kHz 短突发，无硬件 PWM 通路软件翻转）；`Watch_ClockTick20` 由 Timer11 ISR 钩子调用（只计数/置位，禁止 OLED/延时）；游戏内不响应响铃，退出后统一触发回表盘。蜂鸣脚由 `BUZZ_IO`/`BUZZ_PIN` 宏选定：默认 P5.0（LQFP48），PDIP40 封装无 P5.0，设 `WATCH_BUZZ_P34 1` 改用 P3.4，两种取值 code 相同 |
 | [watch_dino.c](watch_dino.c) / [.h](watch_dino.h) | 小恐龙跳跃游戏：仙人掌/翼龙障碍池（池满不重置生成间距下一 tick 重试）、LCG 随机间距、计分 HUD、GAME OVER 卡（25 tick settle 防按键按住瞬间同帧重启） |
@@ -293,7 +293,7 @@ WATCH_TRIM_SPD = 误差秒数 × 86400 ÷ 运行秒数
 
 例：跑了 6 小时慢了 90 秒 → `90 × 86400 ÷ 21600 = 360`，填 `-360`。该值要求绝对值 ≥ 2。
 
-为什么是编译期常量而不是菜单项：早期版本 code+const 占满 64 KB（余 < 400 B），没有 EEPROM 扇区可放参数；2026-11 精简后固件约 53.1 KB（余 ~12.4 KB），已能划出 1~2 KB EEPROM，但校准值仍保留为编译期宏：本板 RTC 无后备电池，开机时间每次归零，漂移只能在连续运行中实测标定，填宏比在菜单里存一个数更直接。RC 漂移随温度变化，一个固定值只能补偿平均值，不能做到完全准确。
+为什么是编译期常量而不是菜单项：早期版本 code+const 占满 64 KB（余 < 400 B），没有 EEPROM 扇区可放参数；2026-11 精简后固件约 52.8 KB（余 ~12.7 KB），已能划出 1~2 KB EEPROM，但校准值仍保留为编译期宏：本板 RTC 无后备电池，开机时间每次归零，漂移只能在连续运行中实测标定，填宏比在菜单里存一个数更直接。RC 漂移随温度变化，一个固定值只能补偿平均值，不能做到完全准确。
 
 另外 `WATCH_USE_X32K`（默认 0）保留给将来焊了 32.768 kHz 晶振的板子：置 1 后上电最多等约 1 秒等起振，成功后精度到 ppm 级（每天 < 1 秒），起振失败自动回退 IRC32K。
 
@@ -337,7 +337,7 @@ USB 虚拟按键：串口控制台发送 `e`（确认）、`b`（返回）、`w`
 - C89（Keil C251），所有菜单数据为定位初始化器，`MenuWindow`/`MenuPage`/`MenuItem` 字段顺序详见 `oled_ui_menudata.c` 头部注释。
 - `edata` 仅保留速度敏感变量（ISR 上下文的 `WatchTickFire`、框架类型钉死的 `Watch_Stage*` 六个暂存 int16），其余状态量在 `xdata`（超时溢出策略：优先迁 xdata）。
 - 框架契约：`OLED_UI_MainLoop()` 每帧（菜单模式由 `Watch_Render` 菜单分支驱动）、`OLED_UI_InterruptHandler()` 每 20ms tick（`Watch_Tick` 驱动）；表盘/秒表模式自行消耗全部 `USBCtrl_Take*`/`Encoder_Get`，防止虚拟脉冲泄漏进菜单。
-- 构建：`build.bat` 或 `UV4.exe -r ai8051u_templete.uvproj -j0 -o build.log`；当前 0 Error/0 Warning，code 49,295 + const 3,769 = **53,065 B / 64 KB**（余约 12.4K 字节），data 8.4，edata+hdata 1937/2048，xdata 4510/32768。烧录前请确认 STC-ISP 的「EEPROM 大小设置」为 0K（或 ≤8K）；程序区 64 KB 时固件只占 53.1 KB，即使划 8 KB EEPROM 也能装下。
+- 构建：`build.bat` 或 `UV4.exe -r ai8051u_templete.uvproj -j0 -o build.log`；当前 0 Error/0 Warning，code 49,061 + const 3,769 = **52,830 B / 64 KB**（余约 12.7K 字节），data 8.4，edata+hdata 1937/2048，xdata 4510/32768。烧录前请确认 STC-ISP 的「EEPROM 大小设置」为 0K（或 ≤8K）；程序区 64 KB 时固件只占 52.8 KB，即使划 8 KB EEPROM 也能装下。
 - 刷新策略：`OLED_Update()` 逐页比对显存镜像，只推送内容变化的页（颜色模式真变化时强制整屏推送，保证反色闪屏不丢）；编码器在 I2C 忙等中采样，快速旋转不丢步。
 
 ## 许可证

@@ -515,7 +515,7 @@ void Watch_Plane_Render(void)
     /* GAME OVER layout: big title, score line, key hints */
     if (PlOver != 0)
     {
-        OLED_Printf(19, 8, OLED_10X20_HALF, (char code *)"GAME OVER");
+        OLED_Printf(28, 10, OLED_8X16_HALF, (char code *)"GAME OVER");
         OLED_Printf(40, 32, OLED_6X8_HALF, (char code *)"SCORE %d", (int)PlScore);
         OLED_Printf(19, 48, OLED_6X8_HALF, (char code *)"E:AGAIN  B:EXIT");
         OLED_Update();
