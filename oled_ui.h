@@ -41,6 +41,19 @@ extern uint8_t edata OLED_DisplayBuf[OLED_HEIGHT / 8][OLED_WIDTH];
 /* Tiles menu: label distance from screen bottom */
 #define TILES_BOTTOM_DISTANCE       (0)
 
+/* Tiles menu: gap between the focus ring cursor and the focused tile.
+ * The ring is a 1 px inverse video frame in the black gap around the
+ * centre slot; 2 px keeps it clear of the 3 px tile spacing. */
+#define TILES_CURSOR_GAP            (2)
+
+/* List menu: radio checkbox drawn at the right edge of a row.
+ * The box is a real state indicator, not decoration, so it stays even
+ * though the text prefixes are gone. */
+#define RADIO_BOX_SIZE              (9)
+#define RADIO_BOX_GAP               (3)
+/* Horizontal room a row with a radio box must keep free of text */
+#define RADIO_BOX_RESERVE           (RADIO_BOX_SIZE + RADIO_BOX_GAP)
+
 /* List menu long-text auto scroll speed in pixels per frame.
  * Smaller is slower. Use fractions of 1 (eg 0.5). */
 #define LINE_SLIP_SPEED             (0.5f)
@@ -49,14 +62,6 @@ extern uint8_t edata OLED_DisplayBuf[OLED_HEIGHT / 8][OLED_WIDTH];
  * Disabled: the arrow sits dead center and does not tell the user that
  * more tiles wait off screen, the partial next tile plus the slider do. */
 #define IF_DRAW_ARROR               (0)
-
-/* Line prefix symbols */
-#define FUNCTION_PREFIX             ("~")
-#define SUBMENU_PREFIX              (">")
-#define RADIO_PREFIX                ("*")
-#define NONE_PREFIX                 ("-")
-
-#define LINEPERFIX_DISTANCE         (2)
 
 /* Wait for move animation to finish before scrolling long text */
 #define IF_WAIT_ANIMATION_FINISH    (1)
@@ -276,7 +281,6 @@ typedef struct MenuPage {
 
     OLED_Area List_MenuArea;
     unsigned char List_IfDrawFrame;
-    unsigned char List_IfDrawLinePerfix;
     int16_t List_StartPointX;
     int16_t List_StartPointY;
 
@@ -389,7 +393,6 @@ void SetTargetScrollBarHeight(void);
 void SetTargetProbWidth(void);
 
 /* Render */
-void DrawLinePermix(MenuPage *page, MenuID i, OLED_Point *CursorPoint, OLED_Font ASCIIFont);
 void PrintMenuElements(void);
 
 /* Input */

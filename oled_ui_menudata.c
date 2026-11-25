@@ -9,7 +9,7 @@
  *   TopDist, ProbFloat, ProbI8, ProbI16, ProbI32, ProbI64(long*),
  *   DataStep, Min, Max, BottomDist, SideDist, LineH, _LineSlip.
  * MenuPage: Type, Speed, Cursor, Move, FontSize, Parent, Items, LineSpace,
- *   AuxFunc, {Area X,Y,W,H}, DrawFrame, DrawPrefix, StartX, StartY,
+ *   AuxFunc, {Area X,Y,W,H}, DrawFrame, StartX, StartY,
  *   ScrW, ScrH, TileW, TileH, ActiveID, Slot, {Start X,Y}, IfInit.
  * MenuItem: text, callback, submenu, radio, icon, _LineSlip.
  */
@@ -226,7 +226,7 @@ void ShowCDownSecWindow(void)
  * @brief Countdown Start item: with a zero staging run time the start
  *        is blocked with the SET TIME! popup, otherwise the countdown
  *        app opens. The reset drops a carried over remaining time first,
- *        so Start! always arms the countdown from the staging values.
+ *        so Start always arms the countdown from the staging values.
  */
 void CountDownStartMenuCM(void)
 {
@@ -295,7 +295,7 @@ MenuItem xdata MainMenuItems[] = {
     {(char code *)"Up Timer", Watch_OpenUptimer, NULL, (unsigned char edata *)0, Image_uptime, 0.0f},
     {(char code *)"Dino Game", Watch_OpenDino, NULL, (unsigned char edata *)0, Image_dino, 0.0f},
     {(char code *)"Plane War", Watch_OpenPlane, NULL, (unsigned char edata *)0, Image_plane, 0.0f},
-    {(char code *)"More...", NULL, &MoreMenuPage, (unsigned char edata *)0, Image_more, 0.0f},
+    {(char code *)"More", NULL, &MoreMenuPage, (unsigned char edata *)0, Image_more, 0.0f},
     {(char code *)0, NULL, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f}
 };
 
@@ -304,12 +304,12 @@ MenuItem xdata SettingsMenuItems[] = {
     {(char code *)"Brightness", BrightnessWindow, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
     {(char code *)"Dark Mode", NULL, NULL, &ColorMode, (const uint8_t code *)0, 0.0f},
     {(char code *)"Time Set", NULL, &TimeSetMenuPage, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
-    {(char code *)"[Back]", OLED_UI_Back, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
+    {(char code *)"Back", OLED_UI_Back, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
     {(char code *)0, NULL, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f}
 };
 
 MenuItem xdata MoreMenuItems[] = {
-    {(char code *)"[Back]", OLED_UI_Back, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
+    {(char code *)"Back", OLED_UI_Back, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
     {(char code *)"Stopwatch", Watch_OpenStopwatch, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
     {(char code *)0, NULL, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f}
 };
@@ -324,11 +324,13 @@ MenuItem xdata MoreMenuItems[] = {
 
 /* Main tiles menu.
  * LineSpace 3: 32 px tile + 3 px gap = 35 px step, so the third tile
- * keeps a visible slice on screen as a hint that the strip goes on. */
+ * keeps a visible slice on screen as a hint that the strip goes on.
+ * Cursor: default REVERSE_ROUNDRECTANGLE inverts the active label band
+ * (drawn by the framework), PrintMenuElements adds the focus ring. */
 MenuPage xdata MainMenuPage = {
-    MENU_TYPE_TILES, SPEED, NOT_SHOW, UNLINEAR, OLED_UI_FONT_16,
+    MENU_TYPE_TILES, SPEED, REVERSE_ROUNDRECTANGLE, UNLINEAR, OLED_UI_FONT_16,
     NULL, MainMenuItems, 3, MainAuxFunc,
-    {0.0f, 0.0f, 0.0f, 0.0f}, 0, 0, 0, 0,
+    {0.0f, 0.0f, 0.0f, 0.0f}, 0, 0, 0,
     128, 64, 32, 32,
     0, 0, {0.0f, 0.0f}, 0
 };
@@ -336,7 +338,7 @@ MenuPage xdata MainMenuPage = {
 MenuPage xdata SettingsMenuPage = {
     MENU_TYPE_LIST, SPEED, REVERSE_ROUNDRECTANGLE, UNLINEAR, OLED_UI_FONT_12,
     &MainMenuPage, SettingsMenuItems, 4, SettingAuxFunc,
-    {32.0f, 0.0f, 95.0f, 64.0f}, 0, 1, 4, 2,
+    {32.0f, 0.0f, 95.0f, 64.0f}, 0, 4, 2,
     0, 0, 0, 0,
     0, 0, {0.0f, 0.0f}, 0
 };
@@ -344,7 +346,7 @@ MenuPage xdata SettingsMenuPage = {
 MenuPage xdata MoreMenuPage = {
     MENU_TYPE_LIST, SPEED, REVERSE_ROUNDRECTANGLE, UNLINEAR, OLED_UI_FONT_12,
     &MainMenuPage, MoreMenuItems, 4, NULL,
-    {1.0f, 1.0f, 128.0f, 64.0f}, 0, 1, 4, 2,
+    {1.0f, 1.0f, 128.0f, 64.0f}, 0, 4, 2,
     0, 0, 0, 0,
     0, 0, {0.0f, 0.0f}, 0
 };
@@ -359,7 +361,7 @@ MenuPage xdata MoreMenuPage = {
 
 /* Time Set list menu */
 MenuItem xdata TimeSetMenuItems[] = {
-    {(char code *)"[Back]", OLED_UI_Back, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
+    {(char code *)"Back", OLED_UI_Back, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
     {(char code *)"Hour", ShowTimeHourWindow, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
     {(char code *)"Minute", ShowTimeMinuteWindow, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
     {(char code *)"Second", ShowTimeSecondWindow, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
@@ -373,14 +375,14 @@ MenuItem xdata TimeSetMenuItems[] = {
 MenuPage xdata TimeSetMenuPage = {
     MENU_TYPE_LIST, SPEED, REVERSE_ROUNDRECTANGLE, UNLINEAR, OLED_UI_FONT_12,
     &SettingsMenuPage, TimeSetMenuItems, 4, NULL,
-    {32.0f, 0.0f, 95.0f, 64.0f}, 0, 1, 4, 2,
+    {32.0f, 0.0f, 95.0f, 64.0f}, 0, 4, 2,
     0, 0, 0, 0,
     0, 0, {0.0f, 0.0f}, 0
 };
 
 /* Alarm clock list menu (submenu of Main) */
 MenuItem xdata AlarmMenuItems[] = {
-    {(char code *)"[Back]", OLED_UI_Back, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
+    {(char code *)"Back", OLED_UI_Back, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
     {(char code *)"Hour", ShowAlarmHourWindow, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
     {(char code *)"Minute", ShowAlarmMinuteWindow, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
     /* Radio item: the box on the right shows the live alarm state, the
@@ -392,23 +394,23 @@ MenuItem xdata AlarmMenuItems[] = {
 MenuPage xdata AlarmMenuPage = {
     MENU_TYPE_LIST, SPEED, REVERSE_ROUNDRECTANGLE, UNLINEAR, OLED_UI_FONT_12,
     &MainMenuPage, AlarmMenuItems, 4, NULL,
-    {32.0f, 0.0f, 95.0f, 64.0f}, 0, 1, 4, 2,
+    {32.0f, 0.0f, 95.0f, 64.0f}, 0, 4, 2,
     0, 0, {0.0f, 0.0f}, 0
 };
 
 /* Countdown list menu (submenu of Main) */
 MenuItem xdata CountdownMenuItems[] = {
-    {(char code *)"[Back]", OLED_UI_Back, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
+    {(char code *)"Back", OLED_UI_Back, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
     {(char code *)"Minute", ShowCDownMinWindow, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
     {(char code *)"Second", ShowCDownSecWindow, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
-    {(char code *)"Start!", CountDownStartMenuCM, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
+    {(char code *)"Start", CountDownStartMenuCM, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
     {(char code *)0, NULL, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f}
 };
 
 MenuPage xdata CountdownMenuPage = {
     MENU_TYPE_LIST, SPEED, REVERSE_ROUNDRECTANGLE, UNLINEAR, OLED_UI_FONT_12,
     &MainMenuPage, CountdownMenuItems, 4, NULL,
-    {32.0f, 0.0f, 95.0f, 64.0f}, 0, 1, 4, 2,
+    {32.0f, 0.0f, 95.0f, 64.0f}, 0, 4, 2,
     0, 0, {0.0f, 0.0f}, 0
 };
 

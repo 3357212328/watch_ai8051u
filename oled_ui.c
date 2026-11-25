@@ -823,35 +823,22 @@ int16_t GetCurrentMenuPageMaxSlotNum(void)
  */
 void SetTargetCursor(void)
 {
-    int8_t LinePerfixWidth;
-    int8_t RadioCompensationWidth;
     float cursorW;
     float frameW;
-    LinePerfixWidth = 0;
-    RadioCompensationWidth = 0;
     if (CurrentMenuPage->General_MenuType == MENU_TYPE_LIST)
     {
         OLED_UI_Cursor.TargetArea.X = OLED_UI_PageStartPoint.TargetPoint.X - 1.0f;
         OLED_UI_Cursor.TargetArea.Y = OLED_UI_PageStartPoint.TargetPoint.Y +
             CurrentMenuPage->_ActiveMenuID * (CurrentMenuPage->General_LineSpace + CurrentMenuPage->General_FontSize) - 1.0f;
         OLED_UI_Cursor.TargetArea.Height = CurrentMenuPage->General_FontSize + 2;
-        /* Prefix symbol takes extra room */
-        if (CurrentMenuPage->List_IfDrawLinePerfix == 1)
-        {
-            LinePerfixWidth = GetOLED_Font(CurrentMenuPage->General_FontSize, ASCII) + LINEPERFIX_DISTANCE;
-        }
-        /* Radio box takes extra room */
+        cursorW = (float)CalcStringWidth(
+            GetOLED_Font(CurrentMenuPage->General_FontSize, CHINESE), GetOLED_Font(CurrentMenuPage->General_FontSize, ASCII), "%s", CurrentMenuPage->General_MenuItems[CurrentMenuPage->_ActiveMenuID].General_item_text) + 2.0f;
+        frameW = OLED_UI_MenuFrame.CurrentArea.Width + OLED_UI_MenuFrame.CurrentArea.X - OLED_UI_PageStartPoint.CurrentPoint.X - 6.0f;
+        /* The radio box owns the right edge: keep the highlight off it */
         if (CurrentMenuPage->General_MenuItems[CurrentMenuPage->_ActiveMenuID].List_BoolRadioBox != NULL)
         {
-            RadioCompensationWidth = (GetOLED_Font(CurrentMenuPage->General_FontSize, CHINESE) + 2);
+            frameW -= (float)RADIO_BOX_RESERVE;
         }
-        else
-        {
-            RadioCompensationWidth = 0;
-        }
-        cursorW = (float)CalcStringWidth(
-            GetOLED_Font(CurrentMenuPage->General_FontSize, CHINESE), GetOLED_Font(CurrentMenuPage->General_FontSize, ASCII), "%s", CurrentMenuPage->General_MenuItems[CurrentMenuPage->_ActiveMenuID].General_item_text) + 2.0f + LinePerfixWidth;
-        frameW = OLED_UI_MenuFrame.CurrentArea.Width + OLED_UI_MenuFrame.CurrentArea.X - OLED_UI_PageStartPoint.CurrentPoint.X - 6.0f - RadioCompensationWidth;
         OLED_UI_Cursor.TargetArea.Width = cursorW < frameW ? cursorW : frameW;
     }
     if (CurrentMenuPage->General_MenuType == MENU_TYPE_TILES)
@@ -860,6 +847,10 @@ void SetTargetCursor(void)
         OLED_UI_Cursor.TargetArea.Y = CurrentMenuPage->Tiles_ScreenHeight - CurrentMenuPage->General_FontSize - TILES_BOTTOM_DISTANCE - 1;
         OLED_UI_Cursor.TargetArea.Height = CurrentMenuPage->General_FontSize + 2;
         OLED_UI_Cursor.TargetArea.Width = CalcStringWidth(GetOLED_Font(CurrentMenuPage->General_FontSize, CHINESE), GetOLED_Font(CurrentMenuPage->General_FontSize, ASCII), "%s", CurrentMenuPage->General_MenuItems[CurrentMenuPage->_ActiveMenuID].General_item_text) + 2;
+        /* The label band is a readout pinned under the name it shows, not
+         * a highlight that travels: snapping it keeps the chip exactly on
+         * the label and stops it sweeping in from the corner on entry. */
+        OLED_UI_Cursor.CurrentArea = OLED_UI_Cursor.TargetArea;
     }
 }
 
@@ -943,45 +934,6 @@ void SetTargetProbWidth(void)
 }
 
 /*
- * @brief Draw the prefix symbol of one list row.
- *        Submenu ">", callback "~", radio "*", plain "-".
- */
-void DrawLinePermix(MenuPage *page, MenuID i, OLED_Point *CursorPoint, OLED_Font ASCIIFont)
-{
-    char *LinePerfixSymb;
-    LinePerfixSymb = "";
-    if (page->List_IfDrawLinePerfix == 1)
-    {
-        if (CurrentMenuPage->General_MenuItems[i].General_SubMenuPage != NULL && page->General_MenuItems[i].General_callback == NULL && page->General_MenuItems[i].List_BoolRadioBox == NULL)
-        {
-            LinePerfixSymb = SUBMENU_PREFIX;
-        }
-        else if (CurrentMenuPage->General_MenuItems[i].General_SubMenuPage == NULL && page->General_MenuItems[i].General_callback != NULL && page->General_MenuItems[i].List_BoolRadioBox == NULL)
-        {
-            LinePerfixSymb = FUNCTION_PREFIX;
-        }
-        else if (CurrentMenuPage->General_MenuItems[i].General_SubMenuPage == NULL && page->General_MenuItems[i].General_callback == NULL && page->General_MenuItems[i].List_BoolRadioBox != NULL)
-        {
-            LinePerfixSymb = RADIO_PREFIX;
-        }
-        else
-        {
-            LinePerfixSymb = NONE_PREFIX;
-        }
-
-        OLED_PrintfArea(
-            OLEDUI_CeilF(OLED_UI_MenuFrame.CurrentArea.X),
-            OLEDUI_CeilF(OLED_UI_MenuFrame.CurrentArea.Y),
-            OLEDUI_CeilF(OLED_UI_MenuFrame.CurrentArea.Width) - 6,
-            OLEDUI_CeilF(OLED_UI_MenuFrame.CurrentArea.Height),
-            OLEDUI_CeilF(CursorPoint->X),
-            OLEDUI_CeilF(CursorPoint->Y),
-            ASCIIFont,
-            "%s", LinePerfixSymb);
-    }
-}
-
-/*
  * @brief Print all visible items of the current page.
  */
 void PrintMenuElements(void)
@@ -995,12 +947,13 @@ void PrintMenuElements(void)
     OLED_Font ChineseFont;
     OLED_Font ASCIIFont;
     OLED_Point CursorPoint;
-    int16_t LinePerfixWidth;
-    int16_t RadioCompensationWidth;
+    float TilesStartY;
+    int16_t RadioBoxReserve;
+    int16_t RadioBoxX;
+    int16_t RadioBoxY;
     int16_t StringLength;
     int16_t ScrollBarHeight;
     int16_t ScrollBarX;
-    char *RadioBoxSymb;
     MenuID i;
 
     page = CurrentMenuPage;
@@ -1010,8 +963,6 @@ void PrintMenuElements(void)
     ChineseFont = GetOLED_Font(page->General_FontSize, CHINESE);
     ASCIIFont = GetOLED_Font(page->General_FontSize, ASCII);
     CursorPoint = TempTargetPoint.CurrentPoint;
-    LinePerfixWidth = 0;
-    RadioCompensationWidth = 0;
 
     if (page->General_MenuType == MENU_TYPE_LIST)
     {
@@ -1019,10 +970,6 @@ void PrintMenuElements(void)
         if (page->List_IfDrawFrame == 1)
         {
             OLED_DrawRectangle(OLEDUI_CeilF(TempTargetArea.CurrentArea.X) - 1, OLEDUI_CeilF(TempTargetArea.CurrentArea.Y) - 1, OLEDUI_CeilF(TempTargetArea.CurrentArea.Width) + 2, OLEDUI_CeilF(TempTargetArea.CurrentArea.Height) + 2, OLED_UNFILLED);
-        }
-        if (page->List_IfDrawLinePerfix == 1)
-        {
-            LinePerfixWidth = ASCIIFont + LINEPERFIX_DISTANCE;
         }
 
         for (i = 0; i < num; i++)
@@ -1036,39 +983,26 @@ void PrintMenuElements(void)
 
             StringLength = CalcStringWidth(ChineseFont, ASCIIFont, "%s", page->General_MenuItems[i].General_item_text);
 
-            DrawLinePermix(page, i, &CursorPoint, ASCIIFont);
-
-            /* Radio box on the right edge */
+            /* Radio row: a real checkbox on the right edge shows the state.
+             * The row keeps that slot free of text. */
             if (page->General_MenuItems[i].List_BoolRadioBox != NULL)
             {
-                RadioCompensationWidth = (ChineseFont + 2);
-                RadioBoxSymb = "";
-                if (*page->General_MenuItems[i].List_BoolRadioBox == 1)
+                RadioBoxReserve = RADIO_BOX_RESERVE;
+                RadioBoxX = OLEDUI_CeilF(TempTargetArea.CurrentArea.X) + OLEDUI_CeilF(TempTargetArea.CurrentArea.Width) - RADIO_BOX_GAP - RADIO_BOX_SIZE;
+                RadioBoxY = OLEDUI_CeilF(CursorPoint.Y) + (page->General_FontSize - RADIO_BOX_SIZE) / 2;
+                OLED_DrawRectangle(RadioBoxX, RadioBoxY, RADIO_BOX_SIZE, RADIO_BOX_SIZE, OLED_UNFILLED);
+                if (*page->General_MenuItems[i].List_BoolRadioBox != 0)
                 {
-                    RadioBoxSymb = "[*]";
+                    OLED_DrawRectangle(RadioBoxX + 2, RadioBoxY + 2, RADIO_BOX_SIZE - 4, RADIO_BOX_SIZE - 4, OLED_FILLED);
                 }
-                else
-                {
-                    RadioBoxSymb = "[ ]";
-                }
-
-                OLED_PrintfArea(
-                    OLEDUI_CeilF(TempTargetArea.CurrentArea.X),
-                    OLEDUI_CeilF(TempTargetArea.CurrentArea.Y),
-                    OLEDUI_CeilF(TempTargetArea.CurrentArea.Width) - 6,
-                    OLEDUI_CeilF(TempTargetArea.CurrentArea.Height),
-                    OLEDUI_CeilF(CursorPoint.X) + OLEDUI_CeilF(TempTargetArea.CurrentArea.Width) - RadioCompensationWidth - 9,
-                    OLEDUI_CeilF(CursorPoint.Y),
-                    ASCIIFont,
-                    "%s", RadioBoxSymb);
             }
             else
             {
-                RadioCompensationWidth = 0;
+                RadioBoxReserve = 0;
             }
 
             /* Scroll text that overflows the row */
-            if (StringLength > (TempTargetArea.TargetArea.X + TempTargetArea.TargetArea.Width - 6 - 2) - TempTargetPoint.TargetPoint.X - LinePerfixWidth - RadioCompensationWidth)
+            if (StringLength > (TempTargetArea.TargetArea.X + TempTargetArea.TargetArea.Width - 6 - 2) - TempTargetPoint.TargetPoint.X - RadioBoxReserve)
             {
 #if IF_WAIT_ANIMATION_FINISH
                 if (TempTargetArea.TargetArea.Width == TempTargetArea.CurrentArea.Width &&
@@ -1084,15 +1018,15 @@ void PrintMenuElements(void)
                 /* Wrap around once fully scrolled out */
                 if (page->General_MenuItems[i]._LineSlip < -StringLength)
                 {
-                    page->General_MenuItems[i]._LineSlip = (TempTargetArea.TargetArea.X + TempTargetArea.TargetArea.Width - 6) - CursorPoint.X - LinePerfixWidth;
+                    page->General_MenuItems[i]._LineSlip = (TempTargetArea.TargetArea.X + TempTargetArea.TargetArea.Width - 6) - CursorPoint.X;
                 }
             }
 
-            OLED_PrintfArea(OLEDUI_CeilF(TempTargetArea.CurrentArea.X) + LinePerfixWidth + CurrentMenuPage->List_StartPointX,
+            OLED_PrintfArea(OLEDUI_CeilF(TempTargetArea.CurrentArea.X) + CurrentMenuPage->List_StartPointX,
                 OLEDUI_CeilF(TempTargetArea.CurrentArea.Y),
-                OLEDUI_CeilF(TempTargetArea.CurrentArea.Width) - 6 - LinePerfixWidth - CurrentMenuPage->List_StartPointX - 2 - RadioCompensationWidth,
+                OLEDUI_CeilF(TempTargetArea.CurrentArea.Width) - 6 - CurrentMenuPage->List_StartPointX - 2 - RadioBoxReserve,
                 OLEDUI_CeilF(TempTargetArea.CurrentArea.Height),
-                OLEDUI_CeilF(CursorPoint.X + LinePerfixWidth + page->General_MenuItems[i]._LineSlip),
+                OLEDUI_CeilF(CursorPoint.X + page->General_MenuItems[i]._LineSlip),
                 OLEDUI_CeilF(CursorPoint.Y),
                 ASCIIFont, "%s", page->General_MenuItems[i].General_item_text);
 
@@ -1101,6 +1035,10 @@ void PrintMenuElements(void)
     }
     if (page->General_MenuType == MENU_TYPE_TILES)
     {
+        /* The strip only slides horizontally, so the row Y is constant for
+         * the whole loop and marks where the cursor ring goes. */
+        TilesStartY = CursorPoint.Y;
+
         for (i = 0; i < num; i++)
         {
             /* Skip tiles fully outside the screen */
@@ -1113,6 +1051,22 @@ void PrintMenuElements(void)
             OLED_ShowImageArea(OLEDUI_CeilF(CursorPoint.X), OLEDUI_CeilF(CursorPoint.Y), page->Tiles_TileWidth, page->Tiles_TileHeight, 0, 0, page->Tiles_ScreenWidth, page->Tiles_ScreenHeight, page->General_MenuItems[i].Tiles_Icon == NULL ? UnKnown : page->General_MenuItems[i].Tiles_Icon);
             CursorPoint.X += (page->Tiles_TileWidth + OLED_UI_LineStep.CurrentDistance);
         }
+
+        /* Selection cursor, part 1: a 1 px inverse video ring around the
+         * centre slot, rounded like the list row highlight. Inverse video
+         * keeps it visible over the white tile backgrounds and over the
+         * black gap alike. The active tile always settles on this slot, so
+         * a ring fixed here reads as the selection while the strip slides
+         * underneath. Painted here, not through OLED_UI_Cursor, because the
+         * generic cursor target only knows the settled position and the
+         * ring has to ride the sliding row Y to stay on the tile.
+         * Part 2 is the label band, drawn by the framework cursor. */
+        ReverseCoordinate(
+            page->Tiles_ScreenWidth / 2 - page->Tiles_TileWidth / 2 - TILES_CURSOR_GAP,
+            OLEDUI_CeilF(TilesStartY) - TILES_CURSOR_GAP,
+            page->Tiles_TileWidth + 2 * TILES_CURSOR_GAP,
+            page->Tiles_TileHeight + 2 * TILES_CURSOR_GAP,
+            HOLLOW_ROUNDRECTANGLE);
         /* Arrow head above the tiles, off by default (see IF_DRAW_ARROR).
          * The preprocessor guard drops the draw call entirely, a plain
          * constant test would leave dead code behind. */
