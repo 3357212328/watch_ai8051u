@@ -7,6 +7,8 @@
 #include "watch_clock.h"
 #include "watch_dino.h"
 #include "watch_plane.h"
+#include "watch_power.h"
+#include "watch_rtc.h"
 
 /* Current and pending app mode */
 static AppMode xdata WatchMode = APP_WATCH_FACE;
@@ -31,6 +33,9 @@ static unsigned char xdata WatchFaceLastBack = 1;
 static unsigned char xdata WatchFaceLastUp = 1;
 static unsigned char xdata WatchFaceLastDown = 1;
 
+/* HOME key edge tracker (second-generation board) */
+static unsigned char xdata WatchLastHome = 1;
+
 /* Fires with the true 20 ms timer ISR, immune to main-loop blocking.
  * Counted and cleared by the stopwatch tick each cycle. */
 static volatile unsigned long edata WatchTickFire = 0;
@@ -54,6 +59,9 @@ static unsigned char xdata WatchTimeSetDirty = 0;
 /* Working area for the watch face renderer */
 static WatchTime xdata WatchFaceTime;
 static char xdata WatchFaceBuf[20];
+
+/* 0 = digital, 1 = analogue; the menu radio edits this directly */
+uint8_t edata Watch_FaceStyle = 0;
 
 /* Weekday names, Monday first */
 static char code WatchWeekNames[7][4] = {
@@ -223,6 +231,10 @@ void Watch_TimeSet_Save(void)
     }
 
     WatchTime_Set(&t);
+    /* Keep the battery-backed RTC in step with a manual time set, so
+     * the next power-up (or the next 60 s re-anchor) does not undo it.
+     * No-op when the module is not fitted. */
+    Watch_RTC_Write(&t);
     WatchTimeSetDirty = 0;   /* next save starts from the live RTC again */
 }
 
@@ -506,10 +518,115 @@ void Watch_OpenPlane(void)
 }
 
 /*
+ * @brief Modal "power off?" prompt. BACK is still held when this runs
+ *        (the long press is what opened it), so the release is awaited
+ *        first; only then does ENTER confirm or BACK cancel.
+ *        Returns 1 = power off confirmed, 0 = cancelled or timed out.
+ */
+static unsigned char Watch_PowerConfirm(void)
+{
+    unsigned int wait;
+
+    OLED_SetColorMode(ColorMode);
+    OLED_Clear();
+    OLED_ShowString(24, 10, (char code *)"POWER OFF?", OLED_8X16_HALF);
+    OLED_ShowString(22, 34, (char code *)"ENTER = YES", OLED_6X8_HALF);
+    OLED_ShowString(22, 44, (char code *)"BACK  = NO", OLED_6X8_HALF);
+    OLED_Update();
+
+    /* Wait for the triggering BACK hold to end (20 s safety cap). */
+    wait = 0;
+    while (Key_GetBackStatus() == 0)
+    {
+        wait++;
+        if (wait > 1000U)
+        {
+            break;
+        }
+        while (get_timer_state(Timer11) == 0)
+        {
+            ;
+        }
+    }
+
+    /* The modal consumed real key edges the app layer never saw: park
+     * every tracker with the live pin state so nothing fires later. */
+    WatchFaceLastEnter = (unsigned char)(Key_GetEnterStatus() == 0);
+    WatchFaceLastBack  = (unsigned char)(Key_GetBackStatus()  == 0);
+    WatchFaceLastUp    = (unsigned char)(Key_GetUpStatus()    == 0);
+    WatchFaceLastDown  = (unsigned char)(Key_GetDownStatus()  == 0);
+
+    wait = 0;
+    while (wait < 600U)                 /* 12 s, then cancel */
+    {
+        if (Key_GetEnterStatus() == 0)
+        {
+            return 1;
+        }
+        if (Key_GetBackStatus() == 0)
+        {
+            /* Cancel: wait for the release so the app that resumes does
+             * not see a phantom BACK press (its edge tracker still holds
+             * the "released" state from before the popup). */
+            wait = 0;
+            while (Key_GetBackStatus() == 0 && wait < 500U)
+            {
+                wait++;
+                while (get_timer_state(Timer11) == 0)
+                {
+                    ;
+                }
+            }
+            WatchFaceLastBack = (unsigned char)(Key_GetBackStatus() == 0);
+            return 0;
+        }
+        wait++;
+        while (get_timer_state(Timer11) == 0)
+        {
+            ;
+        }
+    }
+    return 0;
+}
+
+/*
  * @brief 20 ms tick dispatcher: input sampling and mode transitions.
  */
 void Watch_Tick(void)
 {
+    /* Power services first: the BACK long press has to work in every
+     * mode, and HOME is a global shortcut. */
+    if (Watch_PowerTick() != 0)
+    {
+        if (Watch_PowerConfirm() != 0)
+        {
+            Watch_PowerOff();          /* does not return on battery */
+        }
+        /* Cancelled: the popup painted over the app. Apps clear and
+         * redraw every frame, the menu framework only on change, so the
+         * menu needs an explicit repaint. */
+        if (WatchMode == APP_MENU)
+        {
+            OLED_UI_FadeoutAllArea();
+            OLED_Update();
+        }
+    }
+
+    /* HOME: any screen back to the watch face, torch off. */
+    if (Key_GetHomeStatus() == 0 && WatchLastHome != 0)
+    {
+        Watch_TorchSet(0);
+        if (WatchMode == APP_MENU)
+        {
+            WatchPendingFace = 1;
+        }
+        else if (WatchMode != APP_WATCH_FACE)
+        {
+            Watch_EnterFaceFromMenu();
+        }
+    }
+    WatchLastHome = (unsigned char)(Key_GetHomeStatus() == 0);
+
     /* Ring hijack: the alarm match runs in the 20 ms ISR regardless of
      * mode, so it can fire while a dino/plane game is open (the
      * countdown finish check runs in Countdown_Tick, main context,
@@ -745,6 +862,144 @@ static void Watch_DrawBigPair(int16_t x, int16_t y, unsigned char a,
 }
 
 /*
+ * @brief Watch face entry: digital or analogue, chosen in Settings.
+ */
+static void Watch_RenderFaceDigital(void);
+static void Watch_RenderFaceAnalog(void);
+
+static void Watch_RenderFace(void)
+{
+    if (Watch_FaceStyle != 0)
+    {
+        Watch_RenderFaceAnalog();
+    }
+    else
+    {
+        Watch_RenderFaceDigital();
+    }
+}
+
+/*
+ * @brief Analogue face, 60 tick marks on a 30 px radius circle at
+ *        (64,32). The 60 entry table is the only trig in the build:
+ *        dx = round(30 sin(i*6deg)), dy = round(-30 cos(i*6deg)), so
+ *        index 0 is 12 o'clock and the hands sweep clockwise.
+ */
+static int8_t code WatchRingDX[60] = {
+    0, 3, 6, 9, 12, 15, 18, 20, 22, 24, 26, 27, 29, 29, 30, 30,
+    30, 29, 29, 27, 26, 24, 22, 20, 18, 15, 12, 9, 6, 3,
+    0, -3, -6, -9, -12, -15, -18, -20, -22, -24, -26, -27, -29, -29, -30, -30,
+    -30, -29, -29, -27, -26, -24, -22, -20, -18, -15, -12, -9, -6, -3
+};
+
+static int8_t code WatchRingDY[60] = {
+    -30, -30, -29, -29, -27, -26, -24, -22, -20, -18, -15, -12, -9, -6, -3, 0,
+    3, 6, 9, 12, 15, 18, 20, 22, 24, 26, 27, 29, 29, 30,
+    30, 30, 29, 29, 27, 26, 24, 22, 20, 18, 15, 12, 9, 6, 3, 0,
+    -3, -6, -9, -12, -15, -18, -20, -22, -24, -26, -27, -29, -29, -30
+};
+
+/* Point on the ring at index idx, scaled to len pixels of radius */
+static int16_t Watch_RingX(uint8_t idx, uint8_t len)
+{
+    return (int16_t)(64 + ((int16_t)WatchRingDX[idx] * (int16_t)len) / 30);
+}
+
+static int16_t Watch_RingY(uint8_t idx, uint8_t len)
+{
+    return (int16_t)(32 + ((int16_t)WatchRingDY[idx] * (int16_t)len) / 30);
+}
+
+/* One hand from the centre, thick = 1 draws a 3 px wide stroke */
+static void Watch_DrawHand(uint8_t idx, uint8_t len, uint8_t thick)
+{
+    int16_t x1;
+    int16_t y1;
+
+    x1 = Watch_RingX(idx, len);
+    y1 = Watch_RingY(idx, len);
+    OLED_DrawLine(64, 32, x1, y1);
+    if (thick != 0)
+    {
+        OLED_DrawLine(63, 32, (int16_t)(x1 - 1), y1);
+        OLED_DrawLine(65, 32, (int16_t)(x1 + 1), y1);
+    }
+}
+
+/* 4 bar battery gauge, hidden when the reading is not usable */
+static void Watch_DrawBattery(int16_t x, int16_t y)
+{
+    unsigned int mv;
+    uint8_t bars;
+    uint8_t i;
+
+    mv = Watch_PowerBatteryMvCached();
+    if (mv == 0)
+    {
+        return;
+    }
+    if (mv >= 4000U)      { bars = 4; }
+    else if (mv >= 3800U) { bars = 3; }
+    else if (mv >= 3600U) { bars = 2; }
+    else if (mv >= 3400U) { bars = 1; }
+    else                  { bars = 0; }
+    OLED_DrawRectangle(x, y, 16, 8, OLED_UNFILLED);
+    OLED_DrawRectangle((int16_t)(x + 16), (int16_t)(y + 2), 2, 4, OLED_FILLED);
+    for (i = 0; i < bars; i++)
+    {
+        OLED_DrawRectangle((int16_t)(x + 2 + (int16_t)i * 3), (int16_t)(y + 2), 2, 4, OLED_FILLED);
+    }
+}
+
+static void Watch_RenderFaceAnalog(void)
+{
+    WatchTime t;
+    uint8_t i;
+    uint8_t inner;
+    uint8_t hourIdx;
+    uint8_t minIdx;
+
+    OLED_SetColorMode(ColorMode);
+    OLED_Brightness(OLED_UI_Brightness);
+    OLED_Clear();
+    WatchTime_Read(&t);
+
+    OLED_DrawRectangle(0, 0, 128, 64, OLED_UNFILLED);
+
+    /* 60 ticks: every 5th is a longer hour mark */
+    for (i = 0; i < 60U; i++)
+    {
+        inner = (uint8_t)(((i % 5U) == 0U) ? 23U : 26U);
+        OLED_DrawLine(Watch_RingX(i, inner), Watch_RingY(i, inner),
+                      Watch_RingX(i, 30), Watch_RingY(i, 30));
+    }
+
+    /* Hands: hour = 5 ticks per hour + minute creep, minute, second */
+    hourIdx = (uint8_t)((t.Hour % 12U) * 5U + (t.Minute / 12U));
+    minIdx = t.Minute;
+    Watch_DrawHand(hourIdx, 15, 1);
+    Watch_DrawHand(minIdx, 22, 1);
+    OLED_DrawLine(Watch_RingX((uint8_t)((t.Second + 30U) % 60U), 5),
+                  Watch_RingY((uint8_t)((t.Second + 30U) % 60U), 5),
+                  Watch_RingX(t.Second, 26), Watch_RingY(t.Second, 26));
+    OLED_DrawCircle(64, 32, 2, OLED_FILLED);
+
+    /* Date in the free top-left corner, outside the ring: 5 chars
+     * (30 px) at x 2..31, y 3..10. The ring at y = 10 starts at
+     * x = 44, so there is no collision. */
+    WatchFaceBuf[0] = (char)('0' + t.Month / 10);
+    WatchFaceBuf[1] = (char)('0' + t.Month % 10);
+    WatchFaceBuf[2] = '-';
+    WatchFaceBuf[3] = (char)('0' + t.Day / 10);
+    WatchFaceBuf[4] = (char)('0' + t.Day % 10);
+    WatchFaceBuf[5] = '\0';
+    OLED_ShowString(2, 3, WatchFaceBuf, OLED_6X8_HALF);
+
+    Watch_DrawBattery(108, 3);
+    OLED_Update();
+}
+
+/*
  * @brief Watch face. Four bands, everything centred on x = 64:
  *          date            6x8    y  3..10   x 34..93
  *          big HH:MM       7seg   y 13..44   x 14..113
@@ -753,7 +1008,7 @@ static void Watch_DrawBigPair(int16_t x, int16_t y, unsigned char a,
  *        The colon blinks on the half second and the rail grows by
  *        sub-second, both driven by RTCSSEC, so neither needs an ISR.
  */
-static void Watch_RenderFace(void)
+static void Watch_RenderFaceDigital(void)
 {
     uint16_t rail;
     unsigned char w, i, showColon;
@@ -762,6 +1017,10 @@ static void Watch_RenderFace(void)
     OLED_Brightness(OLED_UI_Brightness);
     OLED_Clear();
     WatchTime_Read(&WatchFaceTime);
+
+    /* Thin frame around the panel: gives the face an edge and keeps the
+     * eye inside the round bezel of the case. */
+    OLED_DrawRectangle(0, 0, 128, 64, OLED_UNFILLED);
 
     /* Band 1: 2026-10-21 (6x8), 60 px wide, centred at x = 34 */
     WatchFaceBuf[0] = '2';
@@ -799,6 +1058,7 @@ static void Watch_RenderFace(void)
     {
         OLED_DrawRectangle(14, 60, (int16_t)rail, 2, OLED_FILLED);
     }
+    Watch_DrawBattery(108, 3);
     OLED_Update();
 }
 

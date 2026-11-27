@@ -13,4 +13,8 @@ unsigned char Watch_Plane_Tick(void);
 /* full-screen draw, one OLED_Update at end */
 void Watch_Plane_Render(void);
 
+/* best score, survives a restart; Set is used by the EEPROM restore */
+unsigned char Watch_Plane_GetHighScore(void);
+void Watch_Plane_SetHighScore(unsigned char value);
+
 #endif

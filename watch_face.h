@@ -30,6 +30,11 @@ typedef enum AppMode {
  * Call once after the clocks/USB are up and before the main loop. */
 void Watch_Init(void);
 
+/* Face style: 0 = digital (7-segment), 1 = analogue (tick ring + hands).
+ * Edited by the "Analog" radio item in Settings, saved with the rest of
+ * the settings record. */
+extern uint8_t edata Watch_FaceStyle;
+
 /* Every 20 ms: sample input, advance modes, drive transitions. */
 void Watch_Tick(void);
 
@@ -56,8 +61,7 @@ void Watch_OpenPlane(void);
 
 /* Time Set staging values (Live data of the edit windows).
  * Year is kept as the full 2000..2099 value, the rest 0..59 / 0..23. */
-extern int16_t edata Watch_StageYear;
-extern int16_t edata Watch_StageMonth;
+extern int16_t edata Watch_StageYear;extern int16_t edata Watch_StageMonth;
 extern int16_t edata Watch_StageDay;
 extern int16_t edata Watch_StageHour;
 extern int16_t edata Watch_StageMinute;

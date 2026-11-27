@@ -16,8 +16,8 @@ static unsigned char edata enc_en;
 
 void Key_Init(void)
 {
-    set_io_mode(pu_mode, Pin32, Pin33, Pin36, Pin37, Pin_End);
-    set_io_mode(en_pur, Pin32, Pin33, Pin36, Pin37, Pin_End);
+    set_io_mode(pu_mode, Pin32, Pin33, Pin36, Pin37, Pin35, Pin_End);
+    set_io_mode(en_pur, Pin32, Pin33, Pin36, Pin37, Pin35, Pin_End);
 }
 
 unsigned char Key_GetEnterStatus(void)
@@ -38,6 +38,11 @@ unsigned char Key_GetUpStatus(void)
 unsigned char Key_GetDownStatus(void)
 {
     return (unsigned char)P37;
+}
+
+unsigned char Key_GetHomeStatus(void)
+{
+    return (unsigned char)P35;
 }
 
 void Timer_Init(void)

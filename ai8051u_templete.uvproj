@@ -330,6 +330,21 @@
               <FilePath>.\main.c</FilePath>
             </File>
             <File>
+              <FileName>watch_power.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\watch_power.c</FilePath>
+            </File>
+            <File>
+              <FileName>watch_rtc.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\watch_rtc.c</FilePath>
+            </File>
+            <File>
+              <FileName>watch_flash.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\watch_flash.c</FilePath>
+            </File>
+            <File>
               <FileName>sys_clock.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\sys_clock.c</FilePath>

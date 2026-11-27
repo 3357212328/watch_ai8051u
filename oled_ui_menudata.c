@@ -2,6 +2,7 @@
 #include "watch_face.h"
 #include "watch_clock.h"
 #include "watch_icons.h"
+#include "watch_power.h"
 
 /* Menu content: windows, pages and items (all positional C89 initializers).
  * Field order follows the structs in oled_ui.h.
@@ -303,6 +304,9 @@ MenuItem xdata MainMenuItems[] = {
 MenuItem xdata SettingsMenuItems[] = {
     {(char code *)"Brightness", BrightnessWindow, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
     {(char code *)"Dark Mode", NULL, NULL, &ColorMode, (const uint8_t code *)0, 0.0f},
+    /* Face style: unchecked = digital, checked = analogue. The face
+     * renderer reads the flag every frame, no callback needed. */
+    {(char code *)"Analog", NULL, NULL, &Watch_FaceStyle, (const uint8_t code *)0, 0.0f},
     {(char code *)"Time Set", NULL, &TimeSetMenuPage, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
     {(char code *)"Back", OLED_UI_Back, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
     {(char code *)0, NULL, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f}
@@ -311,6 +315,9 @@ MenuItem xdata SettingsMenuItems[] = {
 MenuItem xdata MoreMenuItems[] = {
     {(char code *)"Back", OLED_UI_Back, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
     {(char code *)"Stopwatch", Watch_OpenStopwatch, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f},
+    /* Torch: the radio box is the live state, the 20 ms power tick
+     * drives P5.1 from this flag. HOME also switches it off. */
+    {(char code *)"Torch", NULL, NULL, &Watch_TorchFlag, (const uint8_t code *)0, 0.0f},
     {(char code *)0, NULL, NULL, (unsigned char edata *)0, (const uint8_t code *)0, 0.0f}
 };
 

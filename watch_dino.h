@@ -8,5 +8,7 @@
 void Watch_Dino_Open(void);               /* (re)start: reset state, park trackers */
 unsigned char Watch_Dino_Tick(void);      /* 20ms tick; returns 1 = request exit */
 void Watch_Dino_Render(void);             /* full-screen draw, call once per frame */
+unsigned int Watch_Dino_GetHighScore(void); /* best score, survives a restart */
+void Watch_Dino_SetHighScore(unsigned int value); /* used by the EEPROM restore */
 
 #endif

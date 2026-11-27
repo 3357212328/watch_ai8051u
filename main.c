@@ -12,6 +12,7 @@
 #include "set_timer.h"
 #include "watch_face.h"
 #include "watch_time.h"
+#include "watch_power.h"
 
 /* Watch app on the OLED_UI framework:
  * Boot into the digital watch face (on-chip RTC, internal IRC32K).
@@ -30,6 +31,11 @@ void main(void)
 {
     SysClock_Init40MHz_HIRC();
     TFPU_Init120MHz();
+    /* Latch the soft power switch before anything slow happens: on a
+     * key-on boot the P-MOS gate is only held by the pressed button
+     * until P2.6 goes high. Also parks the torch line, arms the IAP
+     * timing and restores the saved settings. */
+    Watch_PowerInit();
     USBCtrl_Init();
     EA = 1;
     /* Ports first, app state second. Watch_Init() parks its release-edge

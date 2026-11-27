@@ -246,6 +246,9 @@ STC 官方为 AI8051U 实验箱提供的完整 32-bit 模式示例代码，覆�
 ├── watch_clock.c / .h            # 闹钟 / 日历 / 正计时 / 倒计时 / 响铃页
 ├── watch_dino.c / .h             # 小恐龙跳跃游戏
 ├── watch_plane.c / .h            # 飞机大战游戏
+├── watch_rtc.c / .h             # 外接 DS3231 / SD3078 断电走时（I2C 共用）
+├── watch_flash.c / .h           # 外接 W25Q64（SPI0）+ 设置记录镜像
+├── watch_power.c / .h           # 软开关 / 长按关机 / 手电筒 / 电池 / 存盘
 ├── watch_icons.c / .h          # 32×32 tile 图标（表盘 + 六新应用 tile）
 ├── build.bat                   # 编译脚本
 ├── .gitignore
@@ -263,11 +266,14 @@ STC 官方为 AI8051U 实验箱提供的完整 32-bit 模式示例代码，覆�
 | 模块 | 说明 |
 |------|------|
 | [watch_time.c](watch_time.c) / [.h](watch_time.h) | 片上 RTC 驱动：XSFR `0x7EFE60+` 寄存器组，时钟源固定内部 IRC32K（`IRC32KCR=0x80` → `RTCCFG\|=0x02`，本板无 32.768K 晶振）；USB 主机在线时用 SIE 的 1ms SOF 帧计数做速率基准自动整秒纠偏（`WatchTime_Discipline`），离线时用 `WATCH_TRIM_SPD` 编译期常量补偿固定漂移（`WatchTime_TrimTick`），详见「时间精度」；`WATCH_USE_X32K=1` 可切外部晶振（需硬件）；INI 写默认值 2026-01-01 12:00 + `RTCCFG\|=0x01` 触发 + 轮询握手；全部 HEX 编码（非 BCD）；轮询模式无 RTC 中断（避开 0x123 向量陷阱）；`WatchTime_Set` 全字段钳位（闰年 2000–2099 用 `year%4`）并用有界等待防振荡器失效死循环 |
-| [watch_face.c](watch_face.c) / [.h](watch_face.h) | 应用状态机 `APP_WATCH_FACE / APP_MENU / APP_STOPWATCH`；表盘 = 日期（F6x8）+ 大字 HH:MM（程序化 7 段数码，20×32 px、3 px 笔画，不占字库 flash，冒号按 SSEC 位 0x40 半秒闪烁）+ 星期与秒（F6x8）+ 100 px 秒进度轨（`sec*128+SubSec` 映射）；秒表 = 同款 7 段 MM:SS + 右下厘秒（Timer11 20ms 中断钩子 `set_timer_isr` 计数器驱动，不受阻塞式刷屏导致的 tick 折叠影响，走时精确） |
+| [watch_face.c](watch_face.c) / [.h](watch_face.h) | 应用状态机 `APP_WATCH_FACE / APP_MENU / APP_STOPWATCH`；表盘 = 日期（F6x8）+ 大字 HH:MM（程序化 7 段数码，20×32 px、3 px 笔画，不占字库 flash，冒号按 SSEC 位 0x40 半秒闪烁）+ 星期与秒（F6x8）+ 100 px 秒进度轨（`sec*128+SubSec` 映射）；秒表 = 同款 7 段 MM:SS + 右下厘秒（Timer11 20ms 中断钩子 `set_timer_isr` 计数器驱动，不受阻塞式刷屏导致的 tick 折叠影响，走时精确）；Settings → Analog 切到指针表盘（60 格刻度 + 时针/分针/秒针，sin/cos 查表 120 B，不用逐像素 atan2）；两种表盘右上角都画 4 格电量（每分钟采样一次） |
 | [watch_icons.c](watch_icons.c) / [.h](watch_icons.h) | 32×32 时钟 tile 图标（SSD1306 列格式，主菜单第一格） |
 | [watch_clock.c](watch_clock.c) / [.h](watch_clock.h) | 闹钟 / 日历 / 正计时 / 倒计时 / 响铃页：闹钟每日 `HH:MM:00` 匹配（连续 2 个 20ms tick 防主态撕裂、非匹配分钟重武装修正每日漏响）；日历 2000–2099 Zeller 星期；正计时/倒计时暂停态可用编码器或 Up/Down 键清零/重载；倒计时计满与闹钟共用响铃页（全屏 1Hz 反色 + P5.0 蜂鸣 2kHz 短突发，无硬件 PWM 通路软件翻转）；`Watch_ClockTick20` 由 Timer11 ISR 钩子调用（只计数/置位，禁止 OLED/延时）；游戏内不响应响铃，退出后统一触发回表盘。蜂鸣脚由 `BUZZ_IO`/`BUZZ_PIN` 宏选定：默认 P5.0（LQFP48），PDIP40 封装无 P5.0，设 `WATCH_BUZZ_P34 1` 改用 P3.4，两种取值 code 相同 |
 | [watch_dino.c](watch_dino.c) / [.h](watch_dino.h) | 小恐龙跳跃游戏：仙人掌/翼龙障碍池（池满不重置生成间距下一 tick 重试）、LCG 随机间距、计分 HUD、GAME OVER 卡（25 tick settle 防按键按住瞬间同帧重启） |
 | [watch_plane.c](watch_plane.c) / [.h](watch_plane.h) | 飞机大战：子弹/敌机双池、无敌帧闪烁、关卡递进（敌机生成 y≥11 保证可被击杀）、渲染自带色模/亮度设置 |
+| [watch_rtc.c](watch_rtc.c) / [.h](watch_rtc.h) | 外接 RTC：DS3231(0x68) / SD3078(0x32) 探测、BCD 转换、12/24 h、清 CH/OSF、读写；没芯片时全部返回「无效」，片上 RTC 继续用 |
+| [watch_flash.c](watch_flash.c) / [.h](watch_flash.h) | 外接 W25Q：SPI0 寄存器级轮询（P1.4~P1.7，10 MHz，P5.2 片选），JEDEC 探测 + 读/页写/扇区擦；只镜像设置记录，没芯片时静默跳过 |
+| [watch_power.c](watch_power.c) / [.h](watch_power.h) | P2.6 软开关自锁、长按 BACK 1.5 s 关机确认、HOME 键（P3.5）、P5.1 手电筒、内部 1.19 V 基准测电池（< 3.4 V 连续 3 分钟关机）、0xFE00 设置记录（15 B，含时间快照/亮度/深色/表盘样式/两个最高分） |
 | [oled_ui.c](oled_ui.c) | 框架扩展：进入菜单时同步物理按键快照 + `OLED_UI_OpenMenu`/顶层菜单 Back 钩子 + 30 秒空闲自动回表盘钩子 |
 | [usb_ctrl.c](usb_ctrl.c) | USB-CDC 控制台虚拟按键（每脉冲恰好一个 20ms tick）+ STC-ISP「设置RTC」对时帧增量解析（见下节） |
 
@@ -293,7 +299,7 @@ WATCH_TRIM_SPD = 误差秒数 × 86400 ÷ 运行秒数
 
 例：跑了 6 小时慢了 90 秒 → `90 × 86400 ÷ 21600 = 360`，填 `-360`。该值要求绝对值 ≥ 2。
 
-为什么是编译期常量而不是菜单项：早期版本 code+const 占满 64 KB（余 < 400 B），没有 EEPROM 扇区可放参数；2026-11 精简后固件约 52.8 KB（余 ~12.7 KB），已能划出 1~2 KB EEPROM，但校准值仍保留为编译期宏：本板 RTC 无后备电池，开机时间每次归零，漂移只能在连续运行中实测标定，填宏比在菜单里存一个数更直接。RC 漂移随温度变化，一个固定值只能补偿平均值，不能做到完全准确。
+为什么是编译期常量而不是菜单项：校准值仍保留为编译期宏——本板 RTC 无后备电池，开机时间每次归零，漂移只能在连续运行中实测标定，填宏比在菜单里存一个数更直接。RC 漂移随温度变化，一个固定值只能补偿平均值，不能做到完全准确。（2026-11 起已有 0xFE00 存盘扇区，设置项改为上电恢复，见下文「第二版硬件」。）
 
 另外 `WATCH_USE_X32K`（默认 0）保留给将来焊了 32.768 kHz 晶振的板子：置 1 后上电最多等约 1 秒等起振，成功后精度到 ppm 级（每天 < 1 秒），起振失败自动回退 IRC32K。
 
@@ -304,7 +310,9 @@ WATCH_TRIM_SPD = 误差秒数 × 86400 ÷ 运行秒数
 | 位置 | 按键 | 动作 |
 |------|------|------|
 | 表盘 | 任意按键**释放** / 编码器转动 / USB 虚拟键 | 进入主菜单（开机默认停在表盘，不会自动进菜单） |
-| 主菜单 | Enter 释放 | 确认选中 tile（Calendar/Up Timer/Dino/Plane 直开应用；Alarm/Count Down/Settings 为子页）；9 个 tile 单行横条滚动，选中项恒居中，底部 14 px 滑块**就是选中光标**（按 `_ActiveMenuID` 在 9 格轨道上移动）；退出应用回到主菜单时停在刚才的 tile，不会跳回第一格；More 现只保留 Stopwatch，Settings 只保留 Brightness / Dark Mode / Time Set / Back（2026-11 为省 flash 删除了字体/长列表/窗口/About 等框架 demo 与 FPS 叠加） |
+| 任意界面 | **HOME（P3.5）** | 直接回表盘并关手电筒（第二版硬件；第一版无此键） |
+| 任意界面 | 长按 **BACK** 1.5 s | 弹「POWER OFF?」：ENTER 确认 → 存盘、断电；BACK 取消。长按期间当前应用会先收到按下沿（游戏/秒表先退出） |
+| 主菜单 | Enter 释放 | 确认选中 tile（Calendar/Up Timer/Dino/Plane 直开应用；Alarm/Count Down/Settings 为子页）；9 个 tile 单行横条滚动，选中项恒居中，底部 14 px 滑块**就是选中光标**（按 `_ActiveMenuID` 在 9 格轨道上移动）；退出应用回到主菜单时停在刚才的 tile，不会跳回第一格；More = Stopwatch + Torch，Settings = Brightness / Dark Mode / Analog / Time Set / Back |
 | 菜单内 | Back 释放 | 返回上级；顶层菜单 Back 返回表盘 |
 | 菜单内 | 30 秒无操作 | 自动回表盘 |
 | Time Set | Enter 打开编辑窗，Up/Down 调值 | 六窗口 Hour/Minute/Second/Year/Month/Day（窗口内钳位）；**打开某窗口时该字段先同步为当前 RTC 值**，Save Time 只回写"打开过窗口"的字段（其余从 RTC 现读，不再把开机快照倒灌），并以闰月天数二次钳位，弹 "Time saved!" |
@@ -332,12 +340,29 @@ USB 虚拟按键：串口控制台发送 `e`（确认）、`b`（返回）、`w`
 5. 偶发丢帧（工具提示发送失败或时间未动）时**再点一次「设置RTC」**即可；毫秒字段仅作校验，RTC 重载将子秒清零（既有 `INISSEC=0` 语义），对时精度为整秒级。
 6. 注意：对时期间不要在工具的串口助手页同时打开同一 COM 口（会占用失败）。
 
+### 第二版硬件（断电走时 / 锂电 / 手电筒 / 外接 Flash）
+
+原理图与逐根接线见 [硬件设计.md](硬件设计.md) 第 10 节、[接线.md](接线.md) 第 11 节。固件侧已落地：
+
+| 模块 | 文件 | 行为 |
+|------|------|------|
+| 软开关 | `watch_power.c` | 上电先把 P2.6 拉高自锁；长按 BACK 1.5 s 弹「POWER OFF?」，ENTER 确认后存盘并断电 |
+| 断电走时 | `watch_rtc.c` | 探测 DS3231(0x68) / SD3078(0x32)，读到就用它校时并每分钟重锚；没芯片时用片上 RTC + 存盘快照 |
+| 存盘 | `watch_power.c` | 15 B 记录写在 MCU 的 0xFE00 扇区；装了 W25Q 时同时镜像到 0 号扇区 |
+| 外接 Flash | `watch_flash.c` | SPI0（P1.4~P1.7，10 MHz）+ P5.2 片选，JEDEC 探测通过才启用 |
+| 电池 | `watch_power.c` | 内部 1.19 V 基准测 VCC（或 P1.2 分压），每分钟一次；< 3.4 V 连续 3 次自动关机；表盘右上角 4 格电量 |
+| 手电筒 | `watch_power.c` | More → Torch 单选，P5.1 直驱 NMOS；HOME 键随时关灯 |
+| HOME | `oled_ui_driver.c` | P3.5，任意界面按下回表盘；第一版板子上悬空，读作未按下 |
+| 表盘样式 | `watch_face.c` | Settings → Analog 切换指针表盘（60 格刻度 + 三针）与数字表盘 |
+
+注意：长按 BACK 时当前应用会先收到按下沿（游戏/秒表会先退出），然后才弹关机框；这是不做按键延迟换来的确定性行为。烧录固件会擦掉 0xFE00，设置随之丢失，W25Q 镜像就是为这一步准备的。
+
 ### 关键实现约束
 
 - C89（Keil C251），所有菜单数据为定位初始化器，`MenuWindow`/`MenuPage`/`MenuItem` 字段顺序详见 `oled_ui_menudata.c` 头部注释。
 - `edata` 仅保留速度敏感变量（ISR 上下文的 `WatchTickFire`、框架类型钉死的 `Watch_Stage*` 六个暂存 int16），其余状态量在 `xdata`（超时溢出策略：优先迁 xdata）。
 - 框架契约：`OLED_UI_MainLoop()` 每帧（菜单模式由 `Watch_Render` 菜单分支驱动）、`OLED_UI_InterruptHandler()` 每 20ms tick（`Watch_Tick` 驱动）；表盘/秒表模式自行消耗全部 `USBCtrl_Take*`/`Encoder_Get`，防止虚拟脉冲泄漏进菜单。
-- 构建：`build.bat` 或 `UV4.exe -r ai8051u_templete.uvproj -j0 -o build.log`；当前 0 Error/0 Warning，code 49,061 + const 3,769 = **52,830 B / 64 KB**（余约 12.7K 字节），data 8.4，edata+hdata 1937/2048，xdata 4510/32768。烧录前请确认 STC-ISP 的「EEPROM 大小设置」为 0K（或 ≤8K）；程序区 64 KB 时固件只占 52.8 KB，即使划 8 KB EEPROM 也能装下。
+- 构建：`build.bat` 或 `UV4.exe -r ai8051u_templete.uvproj -j0 -o build.log`；当前 0 Error/0 Warning，code 54,718 + const 3,888 = **58,606 B / 64 KB**（余约 6.9K 字节），data 8.4，edata+hdata 1943/2048，xdata 4588/32768。存盘扇区固定在 0xFE00（最后一个 512 B），代码增长不会碰到它；烧录前请确认 STC-ISP 的「EEPROM 大小设置」不会把 0xFE00 算进程序区。
 - 刷新策略：`OLED_Update()` 逐页比对显存镜像，只推送内容变化的页（颜色模式真变化时强制整屏推送，保证反色闪屏不丢）；编码器在 I2C 忙等中采样，快速旋转不丢步。
 
 ## 许可证

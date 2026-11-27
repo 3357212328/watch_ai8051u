@@ -9,6 +9,10 @@ unsigned char Key_GetEnterStatus(void);
 unsigned char Key_GetBackStatus(void);
 unsigned char Key_GetUpStatus(void);
 unsigned char Key_GetDownStatus(void);
+/* HOME key on P3.5 (second-generation board only): returns 1 when the
+ * pin is not fitted / released, so a first-generation board just reads
+ * "never pressed" once the pull-up is enabled. */
+unsigned char Key_GetHomeStatus(void);
 
 /* 20ms tick for UI timing */
 void Timer_Init(void);
