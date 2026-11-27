@@ -362,7 +362,7 @@ USB 虚拟按键：串口控制台发送 `e`（确认）、`b`（返回）、`w`
 - C89（Keil C251），所有菜单数据为定位初始化器，`MenuWindow`/`MenuPage`/`MenuItem` 字段顺序详见 `oled_ui_menudata.c` 头部注释。
 - `edata` 仅保留速度敏感变量（ISR 上下文的 `WatchTickFire`、框架类型钉死的 `Watch_Stage*` 六个暂存 int16），其余状态量在 `xdata`（超时溢出策略：优先迁 xdata）。
 - 框架契约：`OLED_UI_MainLoop()` 每帧（菜单模式由 `Watch_Render` 菜单分支驱动）、`OLED_UI_InterruptHandler()` 每 20ms tick（`Watch_Tick` 驱动）；表盘/秒表模式自行消耗全部 `USBCtrl_Take*`/`Encoder_Get`，防止虚拟脉冲泄漏进菜单。
-- 构建：`build.bat` 或 `UV4.exe -r ai8051u_templete.uvproj -j0 -o build.log`；当前 0 Error/0 Warning，code 54,718 + const 3,888 = **58,606 B / 64 KB**（余约 6.9K 字节），data 8.4，edata+hdata 1943/2048，xdata 4588/32768。存盘扇区固定在 0xFE00（最后一个 512 B），代码增长不会碰到它；烧录前请确认 STC-ISP 的「EEPROM 大小设置」不会把 0xFE00 算进程序区。
+- 构建：`build.bat` 或 `UV4.exe -r ai8051u_templete.uvproj -j0 -o build.log`；当前 0 Error/0 Warning，code 54,738 + const 3,888 = **58,626 B / 64 KB**（余约 6.9K 字节），data 8.4，edata+hdata 1943/2048，xdata 4588/32768。存盘扇区固定在 0xFE00（最后一个 512 B），代码增长不会碰到它；烧录前请确认 STC-ISP 的「EEPROM 大小设置」不会把 0xFE00 算进程序区。
 - 刷新策略：`OLED_Update()` 逐页比对显存镜像，只推送内容变化的页（颜色模式真变化时强制整屏推送，保证反色闪屏不丢）；编码器在 I2C 忙等中采样，快速旋转不丢步。
 
 ## 许可证

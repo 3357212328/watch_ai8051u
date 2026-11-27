@@ -531,12 +531,25 @@ void Watch_PowerOff(void)
         }
     }
 
-    /* Still alive means USB is powering the board. Blank the panel and
-     * park; the watch is "off" until the cable is pulled. */
+    /* Still alive means USB (or a board without the latch) is powering
+     * the MCU. Blank the panel and park; a BACK press reboots into the
+     * firmware, which is the only way to "turn on" while the cable is
+     * attached. On battery the rail is already collapsing here. */
     OLED_Clear();
     OLED_Update();
     while (1)
     {
-        ;
+        if (Key_GetBackStatus() == 0)
+        {
+            Delay_ms(30);              /* debounce */
+            if (Key_GetBackStatus() == 0)
+            {
+                IAP_CONTR = 0x20;      /* SWRST: reboot from user code */
+                while (1)
+                {
+                    ;
+                }
+            }
+        }
     }
 }

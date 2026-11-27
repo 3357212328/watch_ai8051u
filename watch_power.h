@@ -40,8 +40,8 @@ void Watch_PowerSave(void);
 void Watch_PowerRestore(void);
 
 /* Save, switch the torch off, release the latch, wait for the button
- * to be released and park. Does not return when the board is on
- * battery; parks with a blank screen when USB keeps it alive. */
+ * to be released and park. On battery the rail drops; when USB keeps
+ * the board alive the panel goes blank and a BACK press reboots. */
 void Watch_PowerOff(void);
 
 /* Battery voltage in mV, 0 when the reading is not trustworthy.
