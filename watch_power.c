@@ -57,6 +57,7 @@ static uint8_t xdata PwTorchPin;
 static uint16_t xdata PwMinuteTicks;
 static uint8_t xdata PwLowCount;
 static uint8_t xdata PwRtcChecked;
+static uint8_t xdata PwIapValid;
 static uint8_t xdata PwRec[PWR_REC_LEN];
 static unsigned int xdata PwMv;
 
@@ -273,32 +274,9 @@ static uint8_t Pw_RecordValid(void)
     return (uint8_t)(sum == PwRec[2]);
 }
 
-void Watch_PowerRestore(void)
+/* Apply a record that already sits in PwRec */
+static void Pw_ApplyRecord(void)
 {
-    uint8_t i;
-    uint8_t ok;
-
-    /* External NOR first: it survives a code reflash, which the
-     * on-chip sector at 0xF000 does not. */
-    ok = 0;
-    if (Watch_FlashPresent() != 0)
-    {
-        if (Watch_FlashRead(0UL, PwRec, PWR_REC_LEN) == 0)
-        {
-            ok = Pw_RecordValid();
-        }
-    }
-    if (ok == 0)
-    {
-        for (i = 0; i < PWR_REC_LEN; i++)
-        {
-            PwRec[i] = Pw_IapReadByte((unsigned int)(PWR_EEPROM_ADDR + i));
-        }
-        if (Pw_RecordValid() == 0)
-        {
-            return;
-        }
-    }
     if (PwRec[9] >= 1 && PwRec[9] <= 100)
     {
         OLED_UI_Brightness = (int16_t)PwRec[9];
@@ -307,6 +285,26 @@ void Watch_PowerRestore(void)
     Watch_Dino_SetHighScore((unsigned int)PwRec[11] | ((unsigned int)PwRec[12] << 8));
     Watch_Plane_SetHighScore(PwRec[13]);
     Watch_FaceStyle = (uint8_t)(PwRec[14] != 0);
+}
+
+void Watch_PowerRestore(void)
+{
+    uint8_t i;
+
+    /* On-chip sector only: the W25Q probe is deliberately deferred to
+     * the first 20 ms tick so the boot path never touches SPI. If this
+     * copy is missing (fresh download) the first tick loads the flash
+     * mirror instead. */
+    for (i = 0; i < PWR_REC_LEN; i++)
+    {
+        PwRec[i] = Pw_IapReadByte((unsigned int)(PWR_EEPROM_ADDR + i));
+    }
+    if (Pw_RecordValid() == 0)
+    {
+        return;
+    }
+    PwIapValid = 1;
+    Pw_ApplyRecord();
 }
 
 /* ------------------------------------------------------------------ */
@@ -431,11 +429,11 @@ void Watch_PowerInit(void)
     PwMinuteTicks = 0;
     PwLowCount = 0;
     PwRtcChecked = 0;
+    PwIapValid = 0;
 
-    /* Optional external NOR: probe before restoring, the record may
-     * live there instead of in the on-chip sector. */
-    Watch_FlashInit();
-
+    /* No SPI here: Watch_FlashInit runs on the first 20 ms tick, after
+     * the panel is already showing the face. A missing or miswired
+     * flash chip therefore cannot keep the watch dark. */
     Watch_PowerRestore();
 }
 
@@ -445,11 +443,22 @@ uint8_t Watch_PowerTick(void)
     uint8_t on;
     unsigned int mv;
 
-    /* First tick after boot: the I2C bus and the OLED are up by now, so
-     * the external RTC can be probed safely. */
+    /* First tick after boot: the panel is already up, so the SPI probe
+     * and the external RTC can run without any chance of a dark boot. */
     if (PwRtcChecked == 0)
     {
         PwRtcChecked = 1;
+        Watch_FlashInit();
+        /* Only when the on-chip copy is gone (fresh download): the NOR
+         * mirror then restores the settings and the high scores. */
+        if (PwIapValid == 0 && Watch_FlashPresent() != 0)
+        {
+            if (Watch_FlashRead(0UL, PwRec, PWR_REC_LEN) == 0 &&
+                Pw_RecordValid() != 0)
+            {
+                Pw_ApplyRecord();
+            }
+        }
         Pw_TimeSync();
         PwMv = Watch_PowerBatteryMv();
     }

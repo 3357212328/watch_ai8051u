@@ -349,7 +349,7 @@ USB 虚拟按键：串口控制台发送 `e`（确认）、`b`（返回）、`w`
 | 软开关 | `watch_power.c` | 上电先把 P2.6 拉高自锁；长按 BACK 1.5 s 弹「POWER OFF?」，ENTER 确认后存盘并断电 |
 | 断电走时 | `watch_rtc.c` | 探测 DS3231(0x68) / SD3078(0x32)，读到就用它校时并每分钟重锚；没芯片时用片上 RTC + 存盘快照 |
 | 存盘 | `watch_power.c` | 15 B 记录写在 MCU 的 0xFE00 扇区；装了 W25Q 时同时镜像到 0 号扇区 |
-| 外接 Flash | `watch_flash.c` | SPI0（P1.4~P1.7，10 MHz）+ P5.2 片选，JEDEC 探测通过才启用 |
+| 外接 Flash | `watch_flash.c` | SPI0（P1.4~P1.7，模式 3，10 MHz）+ P5.2 片选，第一帧后探测 JEDEC，等待全部有超时 |
 | 电池 | `watch_power.c` | 内部 1.19 V 基准测 VCC（或 P1.2 分压），每分钟一次；< 3.4 V 连续 3 次自动关机；表盘右上角 4 格电量 |
 | 手电筒 | `watch_power.c` | More → Torch 单选，P5.1 直驱 NMOS；HOME 键随时关灯 |
 | HOME | `oled_ui_driver.c` | P3.5，任意界面按下回表盘；第一版板子上悬空，读作未按下 |
@@ -362,7 +362,7 @@ USB 虚拟按键：串口控制台发送 `e`（确认）、`b`（返回）、`w`
 - C89（Keil C251），所有菜单数据为定位初始化器，`MenuWindow`/`MenuPage`/`MenuItem` 字段顺序详见 `oled_ui_menudata.c` 头部注释。
 - `edata` 仅保留速度敏感变量（ISR 上下文的 `WatchTickFire`、框架类型钉死的 `Watch_Stage*` 六个暂存 int16），其余状态量在 `xdata`（超时溢出策略：优先迁 xdata）。
 - 框架契约：`OLED_UI_MainLoop()` 每帧（菜单模式由 `Watch_Render` 菜单分支驱动）、`OLED_UI_InterruptHandler()` 每 20ms tick（`Watch_Tick` 驱动）；表盘/秒表模式自行消耗全部 `USBCtrl_Take*`/`Encoder_Get`，防止虚拟脉冲泄漏进菜单。
-- 构建：`build.bat` 或 `UV4.exe -r ai8051u_templete.uvproj -j0 -o build.log`；当前 0 Error/0 Warning，code 54,738 + const 3,888 = **58,626 B / 64 KB**（hex 实际结束地址 `0xE501`，余 6,910 B），data 8.4，edata+hdata 1943/2048，xdata 4588/32768。存盘扇区固定在 0xFE00（最后一个 512 B），代码增长不会碰到它。**烧录前必须把 STC-ISP 的「EEPROM 大小设置」改成 0K**：设成 8K 时程序区只剩 56K（`0xE000`），比当前镜像小 1,282 B，工具就会弹「超出部分已被自动移到 EEPROM 区」——那是分区设置，不是 64 KB 用完。
+- 构建：`build.bat` 或 `UV4.exe -r ai8051u_templete.uvproj -j0 -o build.log`；当前 0 Error/0 Warning，code 54,790 + const 3,888 = **58,678 B / 64 KB**（hex 实际结束地址 `0xE535`，余 6,858 B），data 8.4，edata+hdata 1943/2048，xdata 4589/32768。存盘扇区固定在 0xFE00（最后一个 512 B），代码增长不会碰到它。**烧录前必须把 STC-ISP 的「EEPROM 大小设置」改成 0K**：设成 8K 时程序区只剩 56K（`0xE000`），比当前镜像小 1,334 B，工具就会弹「超出部分已被自动移到 EEPROM 区」——那是分区设置，不是 64 KB 用完。
 - 刷新策略：`OLED_Update()` 逐页比对显存镜像，只推送内容变化的页（颜色模式真变化时强制整屏推送，保证反色闪屏不丢）；编码器在 I2C 忙等中采样，快速旋转不丢步。
 
 ## 许可证

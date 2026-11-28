@@ -15,8 +15,9 @@
  * 0xF000 stays as the fallback.
  */
 
-/* Configure the SPI pins and probe the JEDEC ID. Call once at boot,
- * after the system clock is up. */
+/* Configure the SPI pins and probe the JEDEC ID. Call from the first
+ * 20 ms tick (the panel is already showing the face by then); every
+ * wait inside is bounded, so a missing chip cannot stall anything. */
 void Watch_FlashInit(void);
 
 /* 1 when a 25-series chip answered the probe. */
